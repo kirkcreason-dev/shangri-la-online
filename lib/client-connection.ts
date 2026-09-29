@@ -15,13 +15,25 @@ function playerToken() {
   savedToken = token;
   return token;
 }
-export function gameFetch(path: string, options: RequestInit = {}) {
+export async function gameFetch(path: string, options: RequestInit = {}) {
   if (!path.startsWith("/api/rooms")) throw new Error("Unknown game endpoint.");
-  if (!apiOrigin) return fetch(path, options);
+  if (typeof navigator !== "undefined" && navigator.onLine === false)
+    throw new Error("You’re offline. Your table is saved; reconnect to continue.");
+  const controller = new AbortController();
+  const cancel = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) cancel();
+  else options.signal?.addEventListener("abort", cancel, {once: true});
+  const timeout = setTimeout(() => controller.abort(new Error("The connection is taking too long. Reconnect and check the table before trying again.")), 12000);
   const headers = new Headers(options.headers);
-  headers.set("X-Game-Session", playerToken());
-  return fetch(apiOrigin + path, { ...options, headers, credentials: "omit" });
+  if (apiOrigin) headers.set("X-Game-Session", playerToken());
+  try {
+    return await fetch(apiOrigin + path, {...options, headers, signal: controller.signal, ...(apiOrigin ? {credentials: "omit" as const} : {})});
+  } finally {
+    clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", cancel);
+  }
 }
+
 export function gameAsset(file: string) {
   return gameBasePath + file.replace(/^\//, "");
 }

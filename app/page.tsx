@@ -10,6 +10,9 @@ import {
   cardName,
   character as characterRecord,
 } from "@/lib/rules/catalog";
+import { TableGuide, jumpToTableSection } from "@/components/game/TableGuide";
+import { tableGuidance } from "@/lib/table-guide";
+import { roomCodeFromInput, parseRecentTables, rememberTable, type RecentTable } from "@/lib/table-preferences";
 import { RoomChat } from "@/components/game/RoomChat";
 import { gameFetch, gameBasePath, gameInvite } from "@/lib/client-connection";
 import type { Action, Player, State, Option } from "@/lib/rules/types";
@@ -54,14 +57,15 @@ type PublicRoom = Omit<
   yourPowers: { id: string; summary: string; optional: boolean }[];
   space: { name: string; rules: string } | null;
 };
-async function api(path: string, data?: unknown) {
+async function api(path: string, data?: unknown, signal?: AbortSignal) {
   const r = await gameFetch(path, {
     method: data ? "POST" : "GET",
     headers: data ? { "Content-Type": "application/json" } : undefined,
     body: data ? JSON.stringify(data) : undefined,
     cache: "no-store",
+    signal,
   });
-  const value = (await r.json()) as PublicRoom & { error?: string };
+  const value = (await r.json().catch(() => { throw new Error("The table is temporarily unavailable. Please reconnect."); })) as PublicRoom & { error?: string };
   if (!r.ok) throw new Error(value.error ?? "The table could not be reached.");
   return value as PublicRoom;
 }
@@ -690,7 +694,11 @@ export default function Home() {
     [error, setError] = useState(""),
     [connection, setConnection] = useState(""),
     [toast, setToast] = useState(""),
-    [recent, setRecent] = useState<string[]>([]),
+    [recent, setRecent] = useState<RecentTable[]>([]),
+    [preferencesLoaded, setPreferencesLoaded] = useState(false),
+    [offline, setOffline] = useState(false),
+    [refreshKey, setRefreshKey] = useState(0),
+    [inviteFallback, setInviteFallback] = useState(""),
     [tollItem, setTollItem] = useState(""),
     [search, setSearch] = useState(""),
     [wager, setWager] = useState(0);
@@ -714,29 +722,39 @@ export default function Home() {
       setJoinCode(c);
     }
     try {
-      const saved = JSON.parse(localStorage.getItem("qsl_recent") ?? "[]");
-      setRecent(
-        Array.isArray(saved)
-          ? saved
-              .filter(
-                (x: unknown) =>
-                  typeof x === "string" && /^[A-Z2-9]{6}$/.test(x),
-              )
-              .slice(0, 5)
-          : [],
-      );
+      setRecent(parseRecentTables(localStorage.getItem("qsl_tables") ?? localStorage.getItem("qsl_recent")));
       setName(localStorage.getItem("qsl_name") ?? "");
+      const savedCharacter = localStorage.getItem("qsl_character");
+      if (savedCharacter && CHARACTERS.includes(savedCharacter)) setCharacter(savedCharacter);
     } catch {}
+    setPreferencesLoaded(true);
+    const connectionChanged = () => { setOffline(!navigator.onLine); if (navigator.onLine) setRefreshKey(k => k + 1); };
+    connectionChanged();
+    window.addEventListener("online", connectionChanged);
+    window.addEventListener("offline", connectionChanged);
+    return () => { window.removeEventListener("online", connectionChanged); window.removeEventListener("offline", connectionChanged); };
   }, []);
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    try { localStorage.setItem("qsl_tables", JSON.stringify(recent)); localStorage.setItem("qsl_character", character); } catch {}
+  }, [recent, character, preferencesLoaded]);
+  useEffect(() => {
+    if (!room?.me) return;
+    const seat = room.players.find(p => p.id === room.me);
+    if (!seat) return;
+    if (CHARACTERS.includes(seat.character)) setCharacter(seat.character);
+    setRecent(old => rememberTable(old, {code: room.code, character: seat.character, playerName: seat.name, status: room.status, round: room.round, players: room.players.length, lastSeen: Date.now()}));
+  }, [room?.code, room?.rev, room?.me]);
   useEffect(() => {
     if (!code) return;
     let cancelled = false,
       running = false;
+    const controller = new AbortController();
     async function load() {
-      if (running || busyRef.current) return;
+      if (running || busyRef.current || document.hidden || !navigator.onLine) return;
       running = true;
       try {
-        const next = await api("/api/rooms/" + code);
+        const next = await api("/api/rooms/" + code, undefined, controller.signal);
         if (!cancelled) {
           update(next);
           setConnection("");
@@ -749,21 +767,21 @@ export default function Home() {
     }
     void load();
     const timer = setInterval(load, 2000);
+    document.addEventListener("visibilitychange", load);
     return () => {
-      cancelled = true;
+      cancelled = true; controller.abort();
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", load);
     };
-  }, [code, update]);
+  }, [code, update, refreshKey]);
   function remember(c: string) {
-    try {
-      const list = [c, ...recent.filter((x) => x !== c)].slice(0, 5);
-      localStorage.setItem("qsl_recent", JSON.stringify(list));
-      localStorage.setItem("qsl_name", name);
-      setRecent(list);
-    } catch {}
-    window.history.replaceState({}, "", `?room=${c}`);
-    setCode(c);
-    setJoinCode(c);
+    try { localStorage.setItem("qsl_name", name); } catch {}
+    window.history.replaceState({}, "", gameInvite(c));
+    setCode(c); setJoinCode(c);
+  }
+  function reopen(c: string) {
+    setRoom(null); setError(""); setConnection(""); setToast(""); setInviteFallback("");
+    remember(c); setRefreshKey(k => k + 1);
   }
   async function enter(join: boolean) {
     if (busyRef.current) return;
@@ -771,10 +789,11 @@ export default function Home() {
     setBusy(true);
     setError("");
     try {
-      if (join && !/^[A-Z2-9]{6}$/.test(joinCode.trim().toUpperCase()))
-        throw new Error("Enter the six-character room code.");
+      const parsedCode = roomCodeFromInput(joinCode);
+      if (join && !parsedCode)
+        throw new Error("Enter a six-character room code or paste an invite link.");
       const next = await api(
-        join ? "/api/rooms/" + joinCode.trim().toUpperCase() : "/api/rooms",
+        join ? "/api/rooms/" + parsedCode : "/api/rooms",
         { name, character },
       );
       update(next);
@@ -899,9 +918,12 @@ export default function Home() {
     setConnection("");
     setError("");
     setToast("");
+    setInviteFallback("");
     window.history.replaceState({}, "", gameBasePath);
   }
   function move(region: number, pos: number) {
+    const destination = choices.find(c => c.region === region && c.pos === pos);
+    if (destination?.itemToll && !tollItem) { setError("Choose an Item to pay the Portal toll, then select your destination."); jumpToTableSection("table-controls"); return; }
     action({ type: "move", region, pos, item: tollItem || undefined });
   }
   async function copy() {
@@ -910,12 +932,19 @@ export default function Home() {
         gameInvite(room!.code),
       );
       setToast("Invite link copied.");
+      setInviteFallback("");
     } catch {
-      setToast(`Share room code ${room?.code}`);
+      setToast("Select and copy this invite link, or share the room code.");
+      setInviteFallback(gameInvite(room!.code));
     }
   }
+  const guide = room ? tableGuidance(room) : null;
+  useEffect(() => {
+    document.title = room ? `${guide?.attention ? "Your move · " : ""}${room.code} · Shangri-La` : "Shangri-La Online · Official Beta";
+    return () => { document.title = "Shangri-La Online · Official Beta"; };
+  }, [room?.code, guide?.attention]);
   return (
-    <main>
+    <main className={room ? "has-table" : ""}>
       <header className="topbar">
         <div className="wordmark">
           <span className="brand-mark">◇</span>
@@ -936,7 +965,7 @@ export default function Home() {
         </div>
       </header>
       <div className={"game-layout " + (room ? "playing" : "")}>
-        <section className="table">
+        <section className="table" id="table-board" tabIndex={-1}>
           <div className="table-heading">
             <div>
               <span className="eyebrow">
@@ -964,11 +993,13 @@ export default function Home() {
               {room ? `${room.players.length}/6 seated` : "2–6 players"}
             </span>
           </div>
-          {connection && (
-            <div className="error" role="status">
-              {connection} Reconnecting automatically.
+          {(connection || offline || (code && !room)) && (
+            <div className={connection || offline ? "error connection-banner" : "connection-banner"} role="status">
+              <span>{offline ? "You’re offline. Your table is saved." : connection || "Opening your saved table…"}</span>
+              {code && <div><button className="quiet" disabled={offline || busy} onClick={() => setRefreshKey(k => k + 1)}>Reconnect</button><button className="quiet" disabled={busy} onClick={closeView}>Back to tables</button></div>}
             </div>
           )}
+          {room && guide && room.status === "playing" && !room.legacy && <TableGuide guide={guide} phase={room.phase} stats={me} busy={busy} offline={offline} onAction={action} connection={offline ? "OFFLINE" : connection ? "RECONNECTING" : "LIVE TABLE · SAVED AUTOMATICALLY"} />}
           {room?.legacy && (
             <div className="notice">
               <strong>This saved table uses an earlier rules edition.</strong>
@@ -988,7 +1019,7 @@ export default function Home() {
             dice={room?.lastDice}
             choices={choices}
             active={room?.status === "playing" ? active?.id : undefined}
-            disabled={busy}
+            disabled={busy || offline}
             onMove={move}
           />
           <div className="table-footer">
@@ -1097,7 +1128,7 @@ export default function Home() {
             </details>
           )}
         </section>
-        <aside className="sidebar">
+        <aside className="sidebar" id="table-controls" tabIndex={-1}>
           {error && (
             <div className="error" role="alert">
               {error}
@@ -1170,7 +1201,7 @@ export default function Home() {
                 <button
                   className="primary"
                   disabled={
-                    busy ||
+                    busy || offline || (!!code && !room) ||
                     room?.status === "playing" ||
                     room?.status === "finished"
                   }
@@ -1193,24 +1224,20 @@ export default function Home() {
                     }}
                   >
                     <label>
-                      Room code
+                      Room code or invite link
                       <input
                         value={joinCode}
-                        onChange={(e) =>
-                          setJoinCode(
-                            e.target.value
-                              .toUpperCase()
-                              .replace(/[^A-Z2-9]/g, ""),
-                          )
-                        }
-                        maxLength={6}
+                        onChange={(e) => setJoinCode(e.target.value)}
+                        maxLength={2048}
+                        autoCapitalize="characters"
+                        spellCheck={false}
                         required
-                        placeholder="ABC234"
+                        placeholder="ABC234 or paste an invite link"
                       />
                     </label>
                     <button
                       className="secondary"
-                      disabled={busy || !name.trim()}
+                      disabled={busy || offline || (!!code && !room) || !name.trim()}
                     >
                       Join table
                     </button>
@@ -1235,6 +1262,7 @@ export default function Home() {
                   {toast}
                 </p>
               )}
+              {inviteFallback && <label className="invite-fallback">Invite link<input readOnly value={inviteFallback} onFocus={e => e.currentTarget.select()} /></label>}
               {room.status === "lobby" ? (
                 <>
                   <h2>Gather at the table.</h2>
@@ -1246,7 +1274,7 @@ export default function Home() {
                     Your character
                     <select
                       value={me.character}
-                      disabled={busy}
+                      disabled={busy || offline}
                       onChange={(e) =>
                         action({ type: "character", character: e.target.value })
                       }
@@ -1266,7 +1294,7 @@ export default function Home() {
                   <div className="actions">
                     <button
                       className="secondary"
-                      disabled={busy}
+                      disabled={busy || offline}
                       onClick={() => action({ type: "ready" })}
                     >
                       {me.ready ? "Ready · click to unready" : "I’m ready"}
@@ -1276,7 +1304,7 @@ export default function Home() {
                         <button
                           className="primary"
                           disabled={
-                            busy ||
+                            busy || offline ||
                             room.players.length < 2 ||
                             room.players.some((p) => !p.ready)
                           }
@@ -1286,7 +1314,7 @@ export default function Home() {
                         </button>
                         <button
                           className="quiet"
-                          disabled={busy || room.players.length >= 6}
+                          disabled={busy || offline || room.players.length >= 6}
                           onClick={() => action({ type: "add-bot" })}
                         >
                           Add practice opponent
@@ -1384,7 +1412,7 @@ export default function Home() {
                   )}
                   {room.itemPrompt?.kind === "teleport" &&
                     p?.id === room.itemPrompt.player && (
-                      <TeleportForm room={room} act={action} busy={busy} />
+                      <TeleportForm room={room} act={action} busy={busy || offline} />
                     )}
                   {room.encounter && <CardView id={room.encounter} />}{" "}
                   {myTurn &&
@@ -1417,7 +1445,7 @@ export default function Home() {
                           {choices.map((d, i) => (
                             <button
                               key={`${d.region}:${d.pos}:${i}`}
-                              disabled={busy || (d.itemToll && !tollItem)}
+                              disabled={busy || offline || (d.itemToll && !tollItem)}
                               onClick={() => move(d.region, d.pos)}
                             >
                               {spaceName(d.region, d.pos)}
@@ -1438,7 +1466,7 @@ export default function Home() {
                       room={room}
                       p={p}
                       act={action}
-                      busy={busy}
+                      busy={busy || offline}
                     />
                   )}{" "}
                   {canRule && p && !room.pendingCard && !room.itemPrompt && (
@@ -1447,7 +1475,7 @@ export default function Home() {
                       room={room}
                       p={p}
                       act={action}
-                      busy={busy}
+                      busy={busy || offline}
                     />
                   )}{" "}
                   {room.trade && (
@@ -1479,7 +1507,7 @@ export default function Home() {
                               className={
                                 group === "Turn" ? "primary" : "secondary"
                               }
-                              disabled={busy}
+                              disabled={busy || offline}
                               key={i}
                               onClick={() => action(o.action)}
                             >
@@ -1510,17 +1538,17 @@ export default function Home() {
                             onChange={(e) => setWager(Number(e.target.value))}
                           />
                         </label>
-                        <button disabled={busy} className="secondary">
+                        <button disabled={busy || offline} className="secondary">
                           Place wager
                         </button>
                       </form>
                     )}
                   {canUse && p && (
                     <>
-                      <TradeForm room={room} p={p} act={action} busy={busy} />
+                      <TradeForm room={room} p={p} act={action} busy={busy || offline} />
                       <button
                         className="quiet wide"
-                        disabled={busy}
+                        disabled={busy || offline}
                         onClick={() =>
                           action({
                             type: "table-rule",
@@ -1575,7 +1603,7 @@ export default function Home() {
                       <p>{power.summary}</p>
                       {canUse && (
                         <button
-                          disabled={busy}
+                          disabled={busy || offline}
                           className="quiet"
                           onClick={() =>
                             action({
@@ -1673,20 +1701,14 @@ export default function Home() {
           {!room && recent.length > 0 && (
             <section className="panel">
               <h3>Return to a table</h3>
-              <div className="row">
-                {recent.map((c) => (
-                  <button
-                    key={c}
-                    className="quiet"
-                    onClick={() => {
-                      setCode(c);
-                      setJoinCode(c);
-                      window.history.replaceState({}, "", `?room=${c}`);
-                    }}
-                  >
-                    {c}
+              <div className="recent-tables">
+                {recent.map(t => <div className="recent-table" key={t.code}>
+                  <button className="recent-table-open" disabled={busy || offline} onClick={() => reopen(t.code)}>
+                    <strong>{t.code}<span>{t.status === "finished" ? "Finished" : t.status === "playing" ? `Round ${t.round ?? 1}` : "Table"}</span></strong>
+                    <span>{t.character ?? "Resume your saved seat"}{t.players ? ` · ${t.players} players` : ""}</span>
                   </button>
-                ))}
+                  <button className="quiet forget-table" aria-label={`Forget table ${t.code}`} title="Remove from this device’s recent tables" onClick={() => setRecent(old => old.filter(x => x.code !== t.code))}>×</button>
+                </div>)}
               </div>
             </section>
           )}
@@ -1709,6 +1731,11 @@ export default function Home() {
           </section>
         </aside>
       </div>
+      {room && <nav className="table-mobile-nav" aria-label="Jump around your table">
+        <button onClick={() => jumpToTableSection("table-board")}>◇ Board</button>
+        <button className={guide?.attention ? "needs-you" : ""} onClick={() => jumpToTableSection("table-controls")}>{guide?.attention ? "● Your action" : "Controls"}</button>
+        <button onClick={() => jumpToTableSection("table-chat")}>Chat</button>
+      </nav>}
       <dialog ref={rules} className="rules-dialog">
         <div className="modal">
           <div className="modal-head">

@@ -34,6 +34,14 @@ The community inventory repeats a 19-card Detroit atlas. Three Detroit title rea
 
 The board follows your piece, pans and pivots as you move, and frames your legal destinations. Use Follow turn to watch the active player, Full board for the overview, or drag to explore. Rotate with the arrow buttons or Shift-drag; use the zoom buttons or pinch and twist with two fingers. The minimap keeps your place visible. Keyboard controls work with the board focused: arrows pan, +/− zoom, [/] rotate, and Home returns to your piece. Movement effects respect reduced-motion settings.
 
+## Table conveniences
+
+A next-step panel explains the current phase and provides the available roll/end-turn shortcut, with your Life, Combat Bonus and Cash close to the board. Phones have fixed Board, Controls and Chat navigation. The browser tab shows when your action is needed.
+
+Recent tables keep your character, player count and round, and can be removed from the device list without deleting the game. Join with a room code or a full invite link. The game remembers your selected character and refreshes when you return to the tab or regain a connection.
+
+Chat saves unsent drafts within the current browser tab, preserves your scroll position while you read older messages, and offers a jump to unread messages.
+
 ## Online play and chat
 
 Joined players can chat in the lobby and during a game. Messages persist across reloads, and simultaneous messages do not interfere with game turns. Chat retains the latest 100 messages, limits each to 500 characters, and checks membership and author identity on the server. [Firebase setup and testing](docs/FIREBASE.md) describes the server configuration.

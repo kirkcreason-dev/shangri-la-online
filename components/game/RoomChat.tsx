@@ -9,12 +9,21 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
     [sending, setSending] = useState(false),
     [problem, setProblem] = useState(""),
     [connectionProblem, setConnectionProblem] = useState(""),
-    [connected, setConnected] = useState(false);
+    [connected, setConnected] = useState(false),
+    [unread, setUnread] = useState(0);
   const list = useRef<HTMLDivElement>(null),
     retry = useRef<{ id: string; text: string } | null>(null),
     posting = useRef(false),
     firstScroll = useRef(true),
-    version = useRef(0);
+    version = useRef(0),
+    atBottom = useRef(true),
+    lastMessage = useRef<string | undefined>(undefined);
+  const draftKey = `qsl_chat_draft:${code}:${me ?? "viewer"}`;
+  function saveDraft(text: string) { try { if (text) sessionStorage.setItem(draftKey, text); else sessionStorage.removeItem(draftKey); } catch {} }
+  useEffect(() => {
+    if (!me) return;
+    try { setDraft((sessionStorage.getItem(draftKey) ?? "").slice(0, 500)); } catch {}
+  }, [draftKey, me]);
   const merge = useCallback(
     (incoming: ChatMessage[]) =>
       setMessages((old) => {
@@ -59,23 +68,30 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
     void refresh();
     const timer = setInterval(refresh, 2000);
     document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("online", refresh);
     return () => {
       stopped = true;
       controller.abort();
       clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("online", refresh);
     };
   }, [code, me, merge]);
-  useEffect(() => {
+  function jumpToLatest() {
     const node = list.current;
-    if (
-      node &&
-      (firstScroll.current ||
-        node.scrollHeight - node.scrollTop - node.clientHeight < 200 ||
-        messages.at(-1)?.senderId === me)
-    )
-      node.scrollTop = node.scrollHeight;
-    if (messages.length) firstScroll.current = false;
+    if (node) node.scrollTop = node.scrollHeight;
+    atBottom.current = true; setUnread(0);
+  }
+  useEffect(() => {
+    const latest = messages.at(-1);
+    if (!latest || latest.id === lastMessage.current) return;
+    if (firstScroll.current || atBottom.current || latest.senderId === me) jumpToLatest();
+    else {
+      const previous = messages.findIndex(m => m.id === lastMessage.current);
+      setUnread(count => Math.min(100, count + (previous < 0 ? 1 : messages.length - previous - 1)));
+    }
+    lastMessage.current = latest.id;
+    firstScroll.current = false;
   }, [messages, me]);
   async function send() {
     const text = draft.trim();
@@ -99,7 +115,8 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
       if (!r.ok) throw Error(data.error ?? "Message not sent. Please retry.");
       merge(data.messages);
       retry.current = null;
-      if (stamp === version.current) setDraft("");
+      if (stamp === version.current) { setDraft(""); saveDraft(""); }
+      setConnectionProblem("");
       setConnected(true);
     } catch (e) {
       setProblem((e as Error).message);
@@ -109,7 +126,7 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
     }
   }
   return (
-    <section className="panel room-chat" aria-label="Room chat">
+    <section className="panel room-chat" aria-label="Room chat" id="table-chat" tabIndex={-1}>
       <div className="row">
         <h3>Room chat</h3>
         {me && (
@@ -124,6 +141,7 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
         <>
           <div
             ref={list}
+            onScroll={e => { const node = e.currentTarget; atBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 40; if (atBottom.current) setUnread(0); }}
             className="chat-messages"
             role="log"
             aria-live="polite"
@@ -157,6 +175,7 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
               ))
             )}
           </div>
+          {unread > 0 && <button className="chat-unread" onClick={jumpToLatest}>{unread} new {unread === 1 ? "message" : "messages"} ↓</button>}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -172,6 +191,7 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
               onChange={(e) => {
                 version.current++;
                 setDraft(e.target.value);
+                saveDraft(e.target.value);
               }}
               onKeyDown={(e) => {
                 if (
@@ -187,7 +207,7 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
             />
             <div className="row chat-send">
               <span className="small">
-                {draft.length}/500 · Shift+Enter for a new line
+                {draft.length}/500 · {draft.length ? "Draft saved in this tab" : "Shift+Enter for a new line"}
               </span>
               <button className="primary" disabled={sending || !draft.trim()}>
                 {sending ? "Sending…" : "Send"}
