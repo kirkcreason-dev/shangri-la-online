@@ -12,7 +12,7 @@ New tables use version 3. Existing prototype rooms remain readable and are prese
 - The Purchase supply contains 40 Item cards representing 14 types. Thirteen Bone cards are included. Cash objects found in the community Purchase stack are excluded from the shop supply.
 - Combat supports one selected Weapon, ranged attacks, both players declaring equipment before rolling, natural 1/10 results, weapon breakage, optional armor, conditional modifiers, and the winner’s choice of PvP penalty.
 - Item inventories, Homies, Purchase stock, trade offers requiring acceptance, first-death replacement characters, and all ten ending structures are represented.
-- Room state is saved in D1. Session cookies identify seats, spectators cannot act, and revision checks reject concurrent stale writes. Deck order and unrevealed endings stay on the server.
+- New rooms can be saved in Firebase Firestore; existing rooms remain in D1. Session cookies identify seats, spectators cannot act, and revision checks reject concurrent stale writes. Deck order and unrevealed endings stay on the server.
 
 ## Assisted effects and remaining fidelity limits
 
@@ -25,6 +25,10 @@ Version 3 integrates Casket resurrection before possessions are lost, Psychopath
 Timing conventions are visible in the rules panel: timed Bones count future full turns and apply immediately, the left-hand controller follows fixed lobby order, King High Bone lasts ten real minutes including disconnect time, Amputation caps Items at three even with Backpack, and Concussion clears on an unmodified movement total of six. These fill ambiguities in the printed cards.
 
 The community inventory repeats a 19-card Detroit atlas. Three Detroit title readings remain uncertain. Page 1 of the scanned rulebook lists 110 Detroit, 90 Nethervoid, 70 Dark Carnival, 42 Purchase and 13 Bone cards. The recovered records therefore fall short, and their identities/copy counts have not been certified against a complete physical retail set. Starting equipment is allocated from this observed finite supply; combinations exhausting it are rejected rather than manufacturing cards. Card artwork is not reproduced. The board photograph retains glare and cropping. Shared online rooms require every participant to have access under the Site’s existing sharing settings.
+
+## Online play and chat
+
+Joined players can chat in the lobby and during a game. Messages persist across reloads, and simultaneous messages do not interfere with game turns. Chat retains the latest 100 messages, limits each to 500 characters, and checks membership and author identity on the server. [Firebase setup and testing](docs/FIREBASE.md) describes the server configuration.
 
 ## Sources
 

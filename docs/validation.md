@@ -19,3 +19,13 @@ Old rules editions remain readable and require a new table for edition 3. No exi
 4. Replace the imperfect board photograph and reconcile visual components before making any replica claim. No official status is claimed.
 
 This update is a private assisted-tabletop build. Passing these checks does not make it a complete or release-ready replica.
+
+## Firebase rooms and chat update
+
+- 117 unit/engine tests pass, including chat validation, authoritative authors, duplicate retry handling, cooldowns, and bounded history.
+- TypeScript and targeted ESLint checks pass; the production build succeeds.
+- Firestore emulator checks pass for atomic creation, stale game revisions, independent chat writes, persistent history, and room creation limits.
+- HTTP checks pass for two and six independent players using Firestore: join, ready, start, private-state filtering, simultaneous-turn rejection, movement, and synchronized views.
+- Chat HTTP checks pass in both D1 and Firestore modes: membership, author spoof prevention, concurrent authors, retry idempotency, rate/length limits, reconnect, and unchanged game revision.
+- Browser verification confirms sending with Enter, displaying the server-authorized name, clearing the sent draft, and retaining the message after a reload.
+- The production Firebase project and default database are separate from emulator test data. Production activation requires the server's database credential and a deployment with that secret configured. Site sharing remains separate from room invitations.

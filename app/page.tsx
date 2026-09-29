@@ -11,6 +11,7 @@ import {
   cardName,
   character as characterRecord,
 } from "@/lib/rules/catalog";
+import { RoomChat } from "@/components/game/RoomChat";
 import type { Action, Player, State, Option } from "@/lib/rules/types";
 type PublicRoom = Omit<
   State,
@@ -1652,6 +1653,9 @@ export default function Home() {
                 />
               ))}
             </section>
+          )}
+          {room && !room.legacy && (
+            <RoomChat key={room.code} code={room.code} me={room.me} />
           )}
           {room && (
             <section className="panel">

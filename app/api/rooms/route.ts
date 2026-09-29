@@ -1,3 +1,31 @@
-import {makeRoom,dice,CHARACTERS,publicState} from '@/lib/game';
-import {database,session,body,playerInput,result,fail} from '@/lib/store';
-export async function POST(req:Request){try{const b=await body(req);const name=playerInput(b);const character=CHARACTERS.includes(b.character)?b.character:CHARACTERS[0];const sid=await session();const db=database();const count=await db.prepare('SELECT COUNT(*) AS n FROM rooms WHERE owner = ? AND created_at > ?').bind(sid,Date.now()-3600000).first<{n:number}>();if((count?.n??0)>=10)return result({error:'You have opened several tables. Reuse an existing room or try again in an hour.'},429);const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let i=0;i<5;i++){const code=Array.from({length:6},()=>alphabet[dice(alphabet.length)-1]).join('');const s=makeRoom(code,sid,name,character);const r=await db.prepare('INSERT OR IGNORE INTO rooms (code,state,revision,owner,created_at,updated_at) VALUES (?,?,0,?,?,?)').bind(code,JSON.stringify(s),sid,Date.now(),Date.now()).run();if(r.meta.changes===1)return result(publicState(s,sid),201)}throw new Error('Could not open a table. Please try again.')}catch(e){return fail(e)}}
+import { makeRoom, dice, CHARACTERS, publicState } from "@/lib/game";
+import {
+  createRoom,
+  session,
+  body,
+  playerInput,
+  result,
+  fail,
+} from "@/lib/store";
+export async function POST(req: Request) {
+  try {
+    const b = await body(req);
+    const name = playerInput(b);
+    const character = CHARACTERS.includes(b.character)
+      ? b.character
+      : CHARACTERS[0];
+    const sid = await session();
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    for (let i = 0; i < 5; i++) {
+      const code = Array.from(
+        { length: 6 },
+        () => alphabet[dice(alphabet.length) - 1],
+      ).join("");
+      const s = makeRoom(code, sid, name, character);
+      if (await createRoom(s, sid)) return result(publicState(s, sid), 201);
+    }
+    throw new Error("Could not open a table. Please try again.");
+  } catch (e) {
+    return fail(e);
+  }
+}
