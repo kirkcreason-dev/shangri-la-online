@@ -1,55 +1,39 @@
 # Shangri-La Online
 
-An unofficial, playable browser adaptation inspired by **The Quest for Shangri-La**. This is a prototype, not an official release or a perfect replica. No endorsement by ICP, Psychopathic Records, or Dark Carnival Games is claimed.
+An unofficial multiplayer **assisted tabletop** for The Quest for Shangri-La. This is not an official release, a visual replica, or a fully automated implementation of every physical-game interaction.
 
-## Play
+## Corrected rules edition
 
-Enter a name, choose one of the 18 character names, and create a table. Copy its invite link so friends can join. Everyone marks themselves ready and the host starts. Tables support 2–6 players; a host can add practice opponents for solo play.
+New tables use version 2. Existing prototype rooms remain readable and are preserved; they cannot be converted into a mix of incompatible rule sets.
 
-Roll, choose a highlighted destination, then resolve an encounter or challenge another player in your space. Improve your combat bonus, cross the three regions, and defeat the guardian at Shangri-La. The in-game **Rules & sources** panel explains this version.
+- All 18 character records use researched starting Life, Combat Bonus, Cash, allegiance, location, equipment, and paraphrased power descriptions.
+- All 60 board spaces have audited effects. The Pipeline costs $100 inward. The Portal costs one Item inward. Magic Ninja waives tolls; Shangri-La still requires 15 base Combat Bonus.
+- The recovered Action decks contain 101 Detroit, 90 Nethervoid, and 69 Dark Carnival component records. Names, numbers and mechanical summaries replace the invented 48-card prototype deck.
+- The Purchase supply contains 40 Item cards representing 14 types. Thirteen Bone cards are included. Cash objects found in the community Purchase stack are excluded from the shop supply.
+- Combat supports one selected Weapon, ranged attacks, both players declaring equipment before rolling, natural 1/10 results, weapon breakage, optional armor, conditional modifiers, and the winner’s choice of PvP penalty.
+- Item inventories, Homies, Purchase stock, trade offers requiring acceptance, first-death replacement characters, and all ten ending structures are represented.
+- Room state is saved in D1. Session cookies identify seats, spectators cannot act, and revision checks reject concurrent stale writes. Deck order and unrevealed endings stay on the server.
 
-Seats reconnect in the same browser using a persistent, HTTP-only cookie. Save the invite link. Clearing cookies loses control of that seat. Rooms save after every action. Anyone who knows a room code can watch; they can join only before the game starts. There is no lobby listing, kick feature, or turn timer.
+## Assisted effects and remaining fidelity limits
 
-Site access is separate from room invitations. A private hosted preview is available only to the owner until its audience is changed to allow other visitors.
+The game automates movement, core combat, common board effects, basic purchases, and several character powers. **Most conditional cards, persistent Bones, and unusual power interactions require table adjudication.** Each component shows its paraphrased mechanics and source link. Logged controls let the resolving player or host roll dice, adjust stats, move tokens, transfer/discard/retrieve cards, and record conditions. Conditional combat modifiers are explicitly declared. These controls assume a cooperative table; they are not an anti-cheat rules engine.
 
-## Implemented
+Manual controls do not automatically enforce every timing window or override an already resolved ending/death. Resurrection Items, replacement endings, borrowed powers, temporary turn control, real-time Bone effects, and other exceptions need further automated integration. Do not treat this edition as mechanically perfect or tournament verified.
 
-- Original board photograph with all 60 spaces mapped across Detroit, Nethervoid, and Dark Carnival.
-- 18 selectable character names; uniform prototype starting stats.
-- Shared rooms, ready controls, turn ownership, saved state, reconnection, spectators, and practice opponents.
-- Server-generated dice and shuffled encounters. Future deck contents and session credentials are never sent to the browser.
-- Movement, regional passages, encounters, combat, supplies, healing, player challenges, one rebirth, elimination, and victory.
-- Optimistic concurrency prevents double actions. Clients poll every two seconds and refresh after conflicts.
-- Desktop and phone layouts; keyboard-accessible move choices.
-- Optional WebMCP tools to read the current table and perform validated game actions.
+The community inventory repeats a 19-card Detroit atlas. Three Detroit title readings remain uncertain. The observed counts have not been certified against a complete physical retail set. Starting equipment is allocated from this observed finite supply; combinations exhausting it are rejected rather than manufacturing cards. Card artwork is not reproduced. The board photograph retains glare and cropping. Shared online rooms require every participant to have access under the Site’s existing sharing settings.
 
-## Differences from the physical game
+## Sources
 
-The 48 encounter cards and one guardian ending are newly written. Setup, passage tolls, location effects, inheritance, and the finale are simplified. Every character starts with 5 life, 2 combat bonus, $300, and a tonic. Character powers, original card decks, trading, ranged combat, Bones effects, and the original ten endings are not implemented. Printed board instructions are reference material; the action panel controls the prototype rules.
+- [Scanned rulebook](https://drive.google.com/file/d/1B5uLPQUczukkIaobj1eUxzcDutSJ-1Ml/view)
+- [Community Tabletop Simulator project](https://steamcommunity.com/sharedfiles/filedetails/?id=3079987608)
+- Each card record in `lib/rules/cards.json` links to its source photograph. `lib/rules/characters.json` and `lib/rules/spaces.json` hold the researched character/board records. Descriptions are newly worded mechanical summaries, not a verbatim rulebook or card-text transcription.
 
-The board reference photograph has glare and slight cropping. It is not a clean publisher-supplied scan. Research links and remaining gaps are in [docs/research.md](docs/research.md); factual character setup references are preserved separately and are not active game rules.
+No affiliation with, endorsement by, or official status from ICP/Psychopathic Records or the original game’s creators is claimed.
 
-## Local development
+## Development
 
-Requires Node.js 24+ for the test runner, npm, and Git for publishing. The app uses React, Vinext, Cloudflare Workers, and D1.
+Node 22.13+ (Node 24 recommended). Install dependencies with `npm run install:ci`, apply the D1 migration using the configured local tooling, and run `npm run dev -- --port 4179`. Production builds use the bundled Sites build workflow. The deployment configuration is `.openai/hosting.json`.
 
-```sh
-npm ci
-npm run build
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_solid_echo.sql
-npm run dev -- --host 127.0.0.1 --port 4179
-```
+`npm test` checks character setup, finite stock, turn permissions, passage costs, combat, trade consent, table adjudication, inventory limits, death, ending structures, and legacy-room preservation. Type checking: `npx tsc --noEmit`.
 
-Apply the migration only once to a fresh local database. Game data stays in ignored `.wrangler/state`. No external API keys are required. `.openai/hosting.json` identifies this Site and requests its D1 binding; use the Sites plugin workflow to publish this project. For a different hosting account, configure its Worker and D1 bindings explicitly rather than reusing the Site identifier.
-
-```sh
-npm test
-npx tsc --noEmit
-npm run build
-```
-
-Engine tests cover ownership, readiness, legal movement, resource requirements, hidden state, encounter sequencing, death and rebirth, bots, and complete simulated matches. Local integration checks also verified two separate player sessions, reconnection, spectators, concurrent requests, stale revisions, and a complete shared turn. Browser QA verified creating a room, adding a practice opponent, playing actions, and tool error handling.
-
-## Source and artwork
-
-Original application code and adaptation text were created for this project. The board photograph and referenced game artwork belong to their respective creators. Public availability does not establish a redistribution license. The full rulebook and original card/character scans are not bundled in this app, and no license to third-party materials is granted here.
+Validation for this update: 33 engine tests, TypeScript checks, browser lobby/combat/turn handoff, and local HTTP checks with independent sessions for create/join/ready/start, spectators, concurrent moves, encounter resolution and reconnection. This validates the implementation paths covered, not full physical-game fidelity.

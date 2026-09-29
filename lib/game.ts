@@ -1,49 +1,29 @@
-export const COUNTS=[28,20,12];
-export const REGIONS=['Detroit','Nethervoid','Dark Carnival'];
-export const COLORS=['#e7c375','#bd9bf2','#6ddac4','#f08a9c','#8fbeff','#edb080'];
-export const CHARACTERS=['Violent J','Shaggy 2 Dope','Jamie Madrox','Monoxide','Blaze','Double A','Mad Professor','Squeezy','Willoughby Rags','Big Baby Sweets','Cemetery Girl','Crazy Doug','Mack Benjamin','Hollywood Chuck Hogan','Killnor','Magic Ninja',"Ol’ Evil Eye",'Pumpkin Carver'];
-export type Card={id:string;name:string;kind:'fiend'|'cash'|'heal'|'weapon'|'homie'|'hazard'|'training';value:number;text:string};
-export type Player={id:string;session:string;name:string;character:string;color:string;region:number;pos:number;life:number;maxLife:number;bonus:number;cash:number;weapon:number;homies:number;tonics:number;ready:boolean;dead:boolean;rebirth:boolean;bot?:boolean};
-export type Destination={region:number;pos:number;toll:number};
-export type State={code:string;status:'lobby'|'playing'|'finished';host:string;players:Player[];turn:number;round:number;phase:'roll'|'move'|'encounter'|'combat'|'end';roll:number|null;choices:Destination[];encounter:Card|null;decks:Card[][];discards:Card[][];board:Record<string,Card>;log:string[];winner:string|null;finale:number;finalRevealed:boolean;lastDice:number[];rev:number};
-export type Action={type:string;region?:number;pos?:number;target?:string;item?:string;name?:string;character?:string;version?:number};
-export function dice(sides=6){const a=new Uint32Array(1);const max=Math.floor(4294967296/sides)*sides;do{crypto.getRandomValues(a)}while(a[0]>=max);return a[0]%sides+1}
-function shuffle<T>(a:T[]){for(let i=a.length-1;i>0;i--){const j=dice(i+1)-1;[a[i],a[j]]=[a[j],a[i]]}return a}
-function deck(region:number):Card[]{const names=[['Underpass Shade','Night Bus Phantom','Rooftop Lurker','Rust Hound','Midnight Collector','Alley Stalker'],['Bone Sentinel','Hollow Watcher','Marsh Revenant','Ash Warden','Tunnel Eater','Grave Whisper'],['Broken Marionette','Mirror Double','Carousel Warden','Midway Phantom','Ticket Keeper','Lantern Fiend']][region];const cards:Card[]=names.map((name,i)=>({id:`${region}-f${i}`,name,kind:'fiend',value:5+region*7+i,text:`Defeat strength ${5+region*7+i}. Gain ${region+1} combat bonus. A loss costs 1 life.`}));const extra:[Card['kind'],string,number,string][]=[['cash','A forgotten envelope',200,'Take $200.'],['cash','A favor repaid',300,'Take $300.'],['heal','A quiet refuge',2,'Recover up to 2 life.'],['heal','Second wind',1,'Recover 1 life.'],['weapon','A useful discovery',region+2,`Keep a +${region+2} weapon if it improves your current one.`],['homie','Someone has your back',1,'Gain a companion: +1 to combat rolls.'],['hazard','Wrong turn',1,'Lose 1 life.'],['training','Hard-earned experience',1,'Gain 1 combat bonus.'],['training','Trial by midnight',2,'Gain 2 combat bonus.'],['cash','Loose change',100,'Take $100.']];return shuffle([...cards,...extra.map(([kind,name,value,text],i)=>({id:`${region}-e${i}`,name,kind,value,text}))])}
-export function newPlayer(session:string,name:string,character:string,index:number):Player{return {id:crypto.randomUUID(),session,name,character,color:COLORS[index],region:0,pos:0,life:5,maxLife:5,bonus:2,cash:300,weapon:0,homies:0,tonics:1,ready:index===0,dead:false,rebirth:false}}
-export function makeRoom(code:string,session:string,name:string,character:string):State{const p=newPlayer(session,name,character,0);return {code,status:'lobby',host:p.id,players:[p],turn:0,round:1,phase:'roll',roll:null,choices:[],encounter:null,decks:[deck(0),deck(1),deck(2)],discards:[[],[],[]],board:{},log:[`${name} opened the table.`],winner:null,finale:28+dice(6),finalRevealed:false,lastDice:[],rev:0}}
-export function addLog(s:State,msg:string){s.log.unshift(msg);s.log=s.log.slice(0,80)}
-export function current(s:State){return s.players[s.turn]}
-export function score(p:Player){return p.bonus+p.weapon+p.homies}
-export const GATES=[11,18,6];
-const gate=GATES;
-const arrival=[0,8,11];
-export function destinations(p:Player,roll:number):Destination[]{if(p.region===3)return[];const results=new Map<string,Destination>();const walk=(region:number,pos:number,left:number,toll:number,seen:Set<string>)=>{const key=`${region}:${pos}`;if(region===3||left===0){results.set(key,{region,pos,toll:Math.min(toll,results.get(key)?.toll??Infinity)});return;}const n=COUNTS[region];const edges=[{region,pos:(pos+1)%n,cost:0},{region,pos:(pos-1+n)%n,cost:0}];if(pos===gate[region]&&(region<2||p.bonus>=15))edges.push({region:region+1,pos:arrival[region+1]??0,cost:region<2?100*(region+1):0});if(region>0&&pos===arrival[region])edges.push({region:region-1,pos:gate[region-1],cost:0});for(const e of edges){const k=`${e.region}:${e.pos}`;if(!seen.has(k)&&toll+e.cost<=p.cash)walk(e.region,e.pos,left-1,toll+e.cost,new Set([...seen,k]));}};walk(p.region,p.pos,roll,0,new Set([`${p.region}:${p.pos}`]));return [...results.values()]}
-export function locationKind(region:number,pos:number){if(pos===gate[region])return'gate';if((region===0&&pos===25)||(region===1&&pos===13))return'healing';if((region===0&&pos===0)||(region===1&&pos===17))return'market';return'encounter'}
-function endCheck(s:State){const living=s.players.filter(p=>!p.dead);if(living.length===1&&s.status==='playing'){s.status='finished';s.winner=living[0].id;addLog(s,`${living[0].name} is the last survivor and wins.`)}}
-function damage(s:State,p:Player,n=1){p.life=Math.max(0,p.life-n);if(p.life>0)return;if(!p.rebirth&&!s.finalRevealed){p.rebirth=true;p.life=p.maxLife;p.region=0;p.pos=0;p.bonus=2;p.weapon=dice()>2?p.weapon:0;p.homies=dice()>2?p.homies:0;addLog(s,`${p.name} returns for one final life. Combat bonus resets to 2.`)}else{p.dead=true;p.cash=0;p.weapon=0;p.homies=0;addLog(s,`${p.name} has fallen.`);endCheck(s)}}
-function draw(s:State,region:number){if(!s.decks[region].length){s.decks[region]=shuffle(s.discards[region]);s.discards[region]=[]}return s.decks[region].pop()??{id:'rest',kind:'heal' as const,name:'A moment of peace',value:1,text:'Recover 1 life.'}}
-function finishEncounter(s:State,p:Player){if(s.encounter&&!s.encounter.id.startsWith('final-'))s.discards[/^[0-2]-/.test(s.encounter.id)?Number(s.encounter.id[0]):Math.min(p.region,2)].push(s.encounter);s.encounter=null;s.phase='end'}
-export function applyAction(s:State,actorId:string,a:Action){const actor=s.players.find(p=>p.id===actorId);if(!actor)throw new Error('You do not have a seat at this table.');
- if(s.status==='lobby'){
-  if(a.type==='ready'){actor.ready=!actor.ready;return}
-  if(a.type==='character'){if(!a.character||!CHARACTERS.includes(a.character))throw new Error('Choose a character from the list.');if(s.players.some(p=>p.id!==actorId&&p.character===a.character))throw new Error('That character already has a player.');actor.character=a.character;return}
-  if(a.type==='add-bot'){if(actor.id!==s.host)throw new Error('Only the host can add a practice opponent.');if(s.players.length>=6)throw new Error('This table is full.');const c=CHARACTERS.find(c=>!s.players.some(p=>p.character===c))!;const b=newPlayer('bot:'+crypto.randomUUID(),`Wanderer ${s.players.filter(p=>p.bot).length+1}`,c,s.players.length);b.bot=true;b.ready=true;s.players.push(b);addLog(s,'A practice opponent joined.');return}
-  if(a.type==='start'){if(actor.id!==s.host)throw new Error('Only the host can start.');if(s.players.length<2)throw new Error('You need at least two players.');if(s.players.some(p=>!p.ready))throw new Error('Everyone needs to be ready.');s.status='playing';s.turn=dice(s.players.length)-1;addLog(s,`${current(s).name} takes the first turn.`);return}
-  throw new Error('The game has not started yet.');
- }
- if(s.status!=='playing')throw new Error('This game has finished.');const p=current(s);if(actorId!==p.id)throw new Error('Wait for your turn.');if(p.dead)throw new Error('This player has been eliminated.');
- if(a.type==='tonic'){if(p.tonics<1||p.life>=p.maxLife)throw new Error('You need a tonic and missing life.');p.tonics--;p.life=Math.min(p.maxLife,p.life+2);addLog(s,`${p.name} used a tonic and recovered life.`);return}
- if(a.type==='roll'){if(s.phase!=='roll')throw new Error('You have already rolled this turn.');if(p.region===3){s.encounter={id:'final-gate',name:'The Last Guardian',kind:'fiend',value:s.finale,text:`Defeat strength ${s.finale} to claim Shangri-La.`};s.phase='combat';return;}s.roll=dice();s.lastDice=[s.roll];s.choices=destinations(p,s.roll);s.phase='move';addLog(s,`${p.name} rolled ${s.roll}.`);return}
- if(a.type==='move'){if(s.phase!=='move')throw new Error('Roll before moving.');const d=s.choices.find(d=>d.region===a.region&&d.pos===a.pos);if(!d)throw new Error('Choose a highlighted destination.');p.region=d.region;p.pos=d.pos;p.cash-=d.toll;s.choices=[];s.phase='encounter';if(p.region===3){s.finalRevealed=true;s.encounter={id:'final-gate',name:'The Last Guardian',kind:'fiend',value:s.finale,text:`Defeat strength ${s.finale} to claim Shangri-La.`};s.phase='combat';addLog(s,`${p.name} crossed into Shangri-La. The guardian awaits.`)}else addLog(s,`${p.name} moved to ${REGIONS[p.region]} ${p.pos+1}${d.toll?` and paid $${d.toll}`:''}.`);return}
- if(a.type==='draw'){if(s.phase!=='encounter'||s.encounter)throw new Error('Finish the current encounter first.');const key=`${p.region}:${p.pos}`;s.encounter=s.board[key]??draw(s,p.region);s.phase=s.encounter.kind==='fiend'?'combat':'encounter';if(s.encounter.kind==='fiend')s.board[key]=s.encounter;addLog(s,`${p.name} encountered ${s.encounter.name}.`);return}
- if(a.type==='resolve'){if(s.phase!=='encounter'||!s.encounter)throw new Error('Draw an encounter first.');const c=s.encounter;switch(c.kind){case'cash':p.cash+=c.value;break;case'heal':p.life=Math.min(p.maxLife,p.life+c.value);break;case'weapon':p.weapon=Math.max(p.weapon,c.value);break;case'homie':p.homies=Math.min(6,p.homies+c.value);break;case'hazard':damage(s,p,c.value);break;case'training':p.bonus=Math.min(25,p.bonus+c.value);break;default:throw new Error('This encounter requires combat.')}addLog(s,`${p.name}: ${c.text}`);finishEncounter(s,p);return}
- if(a.type==='fight'){if(s.phase!=='combat'||!s.encounter)throw new Error('There is no enemy to fight.');const c=s.encounter,r=dice(10),total=r+score(p),won=r===10||(r!==1&&total>c.value),lost=r===1||(r!==10&&total<c.value);s.lastDice=[r];addLog(s,`${p.name} rolled ${r} + ${score(p)} = ${total} against ${c.value}. ${won?'Victory.':lost?'Lost 1 life.':'A tie.'}`);if(won){delete s.board[`${p.region}:${p.pos}`];if(p.region===3){s.status='finished';s.winner=p.id;addLog(s,`${p.name} reached Shangri-La and defeated the guardian!`)}else p.bonus=Math.min(25,p.bonus+p.region+1)}else if(lost)damage(s,p);if(won)finishEncounter(s,p);else{s.encounter=null;s.phase='end'}return}
- if(a.type==='attack'){if(s.phase!=='encounter'||s.encounter)throw new Error('Choose an opponent before drawing.');const q=s.players.find(q=>q.id===a.target&&!q.dead&&q.id!==p.id&&q.region===p.region&&q.pos===p.pos);if(!q)throw new Error('Choose another player in your space.');const x=dice(10),y=dice(10);s.lastDice=[x,y];const rank=(r:number,v:number)=>r===10?1000:r===1?-1000:r+v;const diff=rank(x,score(p))-rank(y,score(q));if(diff!==0)damage(s,diff>0?q:p);addLog(s,`${p.name} (${x}+${score(p)}) challenged ${q.name} (${y}+${score(q)}). ${diff===0?'Tie.':`${diff>0?q.name:p.name} lost 1 life.`}`);s.phase='end';return}
- if(a.type==='buy'){if(s.phase!=='encounter'||s.encounter||locationKind(p.region,p.pos)!=='market')throw new Error('Visit a market before drawing.');if(p.cash<200)throw new Error('You need $200.');if(a.item==='tonic'){p.tonics++;}else if(a.item==='weapon'){if(p.weapon>=6)throw new Error('Your weapon is already fully upgraded.');p.weapon++}else throw new Error('Unknown item.');p.cash-=200;addLog(s,`${p.name} bought ${a.item==='tonic'?'a healing tonic':'a weapon upgrade'} for $200.`);s.phase='end';return}
- if(a.type==='heal'){if(s.phase!=='encounter'||s.encounter||locationKind(p.region,p.pos)!=='healing')throw new Error('Visit a healing space before drawing.');if(p.cash<100||p.life>=p.maxLife)throw new Error('Healing costs $100 and requires missing life.');p.cash-=100;p.life=Math.min(p.maxLife,p.life+2);s.phase='end';addLog(s,`${p.name} paid $100 to recover life.`);return}
- if(a.type==='end'){if(s.phase!=='end')throw new Error('Finish your encounter before ending the turn.');do{s.turn=(s.turn+1)%s.players.length;if(s.turn===0)s.round++}while(current(s).dead);s.phase='roll';s.roll=null;s.encounter=null;s.choices=[];addLog(s,`${current(s).name} begins their turn.`);return}
- throw new Error('Unknown action.');
+export * from "./rules/engine.ts";
+import { publicState as correctedPublicState } from "./rules/engine.ts";
+import type { State } from "./rules/types.ts";
+export function publicState(s: State, session: string) {
+  if (s.rulesVersion === 2) return correctedPublicState(s, session);
+  const old = s as any;
+  return {
+    rulesVersion: 1,
+    legacy: true,
+    code: old.code,
+    status: old.status,
+    rev: old.rev,
+    host: old.host,
+    turn: old.turn,
+    round: old.round,
+    log: old.log,
+    players: old.players.map(({ session, ...p }: any) => ({
+      ...p,
+      items: [],
+      homies: [],
+      bones: [],
+      notes: "",
+    })),
+    me: old.players.find((p: any) => p.session === session)?.id ?? null,
+    options: [],
+    choices: [],
+    winners: old.winner ? [old.winner] : [],
+  };
 }
-export function runBots(s:State){let limit=40;while(s.status==='playing'&&current(s).bot&&limit-->0){const p=current(s);if(p.life<3&&p.tonics>0)applyAction(s,p.id,{type:'tonic'});let a:Action={type:'end'};if(s.phase==='roll')a={type:'roll'};else if(s.phase==='move'){const options=[...s.choices].sort((a,b)=>b.region-a.region);const d=p.bonus>=[6,10,15][p.region]?options[0]:options.find(d=>d.region===p.region)??options[0];a={type:'move',region:d.region,pos:d.pos}}else if(s.phase==='combat')a={type:'fight'};else if(s.phase==='encounter')a={type:s.encounter?'resolve':'draw'};applyAction(s,p.id,a)}}
-export function publicState(s:State,session:string){const {decks,discards,finale,...pub}=s;return {...pub,finale:s.finalRevealed?finale:null,players:s.players.map(({session:_,...p})=>p),me:s.players.find(p=>p.session===session)?.id??null,deckCounts:decks.map(d=>d.length),discardCounts:discards.map(d=>d.length)}}

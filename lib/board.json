@@ -20,10 +20,10 @@
       "The East Side",
       "City",
       "Police Station",
-      "The Pit",
+      "Belle Isle",
       "Alleyway",
       "Fox Theatre",
-      "St. Andrews",
+      "St. Andrew's",
       "Casino",
       "Zug Island",
       "Hospital",
@@ -46,7 +46,7 @@
       "Tunnels",
       "Marsh Lagoon",
       "Tunnels",
-      "Valley of the Crows",
+      "Valley of the Crow",
       "Cave",
       "Oz",
       "The Wizard's Palace",
@@ -185,7 +185,7 @@
       },
       {
         "index": 19,
-        "name": "The Pit",
+        "name": "Belle Isle",
         "column": 2,
         "row": 7
       },
@@ -203,7 +203,7 @@
       },
       {
         "index": 22,
-        "name": "St. Andrews",
+        "name": "St. Andrew's",
         "column": 0,
         "row": 6
       },
@@ -331,7 +331,7 @@
       },
       {
         "index": 15,
-        "name": "Valley of the Crows",
+        "name": "Valley of the Crow",
         "column": 1,
         "row": 6
       },
