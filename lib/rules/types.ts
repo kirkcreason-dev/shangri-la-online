@@ -196,6 +196,7 @@ export type State = {
   log: string[];
   winner: string | null;
   winners: string[];
+  endedByHost?: string;
   rev: number;
   combat: Combat | null;
   penalty: Penalty | null;

@@ -2500,6 +2500,33 @@ function applyRuling(s: State, actor: Player, a: Action) {
   endCheck(s);
 }
 export function applyAction(s: State, actorId: string, a: Action) {
+  if (a.type === "end-game") {
+    // Authenticate the actual session owner, never the client-supplied actor.
+    const host = s.players.find(p => p.id === actorId && p.id === s.host);
+    need(host, "Only the host can end the game for everyone.");
+    need(s.rulesVersion === 3, "This saved table uses an earlier rules edition.");
+    need(s.status !== "finished", "This game has already ended.");
+    s.status = "finished";
+    s.endedByHost = host!.id;
+    s.phase = "end";
+    s.winner = null;
+    s.winners = [];
+    s.choices = [];
+    s.combat = null;
+    s.penalty = null;
+    s.ruling = null;
+    s.trade = null;
+    s.overflow = null;
+    s.decision = null;
+    s.endingPending = null;
+    delete s.flow;
+    delete s.itemPrompt;
+    delete s.recoil;
+    delete s.pendingVictory;
+    addLog(s, `${host!.name} ended the game for everyone. No winner was declared.`);
+    return;
+  }
+  need(s.status !== "finished", "This game has finished.");
   if (s.flow) {
     const flow = structuredClone(s.flow),
       p = s.players.find((p) => p.id === flow.prompt.player),

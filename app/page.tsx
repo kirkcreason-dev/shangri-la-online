@@ -10,6 +10,7 @@ import {
   cardName,
   character as characterRecord,
 } from "@/lib/rules/catalog";
+import { LearnToPlay } from "@/components/game/LearnToPlay";
 import { TableGuide, jumpToTableSection } from "@/components/game/TableGuide";
 import { tableGuidance } from "@/lib/table-guide";
 import { roomCodeFromInput, parseRecentTables, rememberTable, type RecentTable } from "@/lib/table-preferences";
@@ -685,6 +686,15 @@ function TradeForm({
   );
 }
 export default function Home() {
+  const [learning, setLearning] = useState(false);
+  const [learned, setLearned] = useState(false);
+  const quitDialog = useRef<HTMLDialogElement>(null);
+  const endDialog = useRef<HTMLDialogElement>(null);
+  const [endError, setEndError] = useState("");
+  useEffect(() => {
+    try { setLearned(localStorage.getItem("qsl_tutorial_complete") === "1"); } catch { /* Optional preference. */ }
+    if (new URLSearchParams(window.location.search).get("tutorial") === "1") setLearning(true);
+  }, []);
   const [room, setRoom] = useState<PublicRoom | null>(null),
     [code, setCode] = useState(""),
     [joinCode, setJoinCode] = useState(""),
@@ -955,10 +965,12 @@ export default function Home() {
         <span className="edition">OFFICIAL BETA</span>
         <div className="row">
           {room && (
-            <button className="quiet" onClick={closeView} disabled={busy}>
-              Tables
+            <button className="quiet quit-game-trigger" onClick={() => quitDialog.current?.showModal()} disabled={busy}>
+              Quit game
             </button>
           )}
+          {room && host && !room.legacy && room.status !== "finished" && <button className="quiet end-game-trigger" disabled={busy || offline} onClick={() => {setEndError("");endDialog.current?.showModal();}}>End game</button>}
+          <button className="learn-trigger" onClick={() => setLearning(true)}>Learn to play</button>
           <button className="quiet" onClick={() => rules.current?.showModal()}>
             Rules & cards
           </button>
@@ -979,7 +991,7 @@ export default function Home() {
                   : room?.legacy
                     ? "Saved prototype table"
                     : room?.status === "finished"
-                      ? "The quest is complete."
+                      ? room.endedByHost ? "The game has ended." : "The quest is complete."
                       : room?.status === "playing"
                         ? myTurn
                           ? p?.bot
@@ -1000,6 +1012,8 @@ export default function Home() {
             </div>
           )}
           {room && guide && room.status === "playing" && !room.legacy && <TableGuide guide={guide} phase={room.phase} stats={me} busy={busy} offline={offline} onAction={action} connection={offline ? "OFFLINE" : connection ? "RECONNECTING" : "LIVE TABLE · SAVED AUTOMATICALLY"} />}
+          {room?.status === "finished" && room.endedByHost && <section className="game-ended-banner" role="status"><strong>The host ended this game.</strong><p>No winner was declared. The final board and history are saved; no further turns can be played.</p><button className="quiet" onClick={closeView}>Back to the main menu</button></section>}
+          {!learned && <section className="learn-invitation"><div><span>NEW TO THE QUEST?</span><strong>Learn by playing one short turn.</strong><p>Try moving, drawing a card, and winning a fight. Your real table stays untouched.</p></div><button className="primary" onClick={() => setLearning(true)}>Try the tutorial →</button></section>}
           {room?.legacy && (
             <div className="notice">
               <strong>This saved table uses an earlier rules edition.</strong>
@@ -1334,7 +1348,7 @@ export default function Home() {
               ) : room.status === "finished" ? (
                 <>
                   <h2>
-                    {room.winners
+                    {room.endedByHost ? "Game ended by the host" : room.winners
                       .map((id) => room.players.find((p) => p.id === id)?.name)
                       .join(" & ") || "No survivors"}
                   </h2>
@@ -1704,6 +1718,26 @@ export default function Home() {
         <button className={guide?.attention ? "needs-you" : ""} onClick={() => jumpToTableSection("table-controls")}>{guide?.attention ? "● Your action" : "Controls"}</button>
         <button onClick={() => jumpToTableSection("table-chat")}>Chat</button>
       </nav>}
+      <LearnToPlay open={learning} onClose={() => setLearning(false)} onComplete={() => setLearned(true)} current={room && guide ? {...guide, phase: room.phase} : undefined}/>
+      <dialog ref={endDialog} className="quit-dialog" aria-labelledby="end-game-title" onCancel={e => {if(busy)e.preventDefault();}}>
+        <div className="modal">
+          <span className="eyebrow">HOST CONTROL · EVERYONE AT THIS TABLE</span>
+          <h2 id="end-game-title">End this game for everyone?</h2>
+          <p>This finishes room <strong>{room?.code}</strong> immediately, including any pending turn or card choice. No winner will be declared.</p>
+          <p className="quit-note">Everyone can still view the final board and history. This match cannot be resumed; you can start a new table.</p>
+          {endError && <p className="error" role="alert">{endError}</p>}
+          <div className="quit-actions"><button autoFocus className="quiet" disabled={busy} onClick={() => endDialog.current?.close()}>Keep playing</button><button className="danger-button" disabled={busy || offline || room?.status === "finished"} onClick={async () => {setEndError("");try {await act({type:"end-game",actor:me?.id});endDialog.current?.close();} catch(e) {setEndError((e as Error).message);}}}>{busy?"Ending game…":"End game for everyone"}</button></div>
+        </div>
+      </dialog>
+      <dialog ref={quitDialog} className="quit-dialog" aria-labelledby="quit-title">
+        <div className="modal">
+          <span className="eyebrow">LEAVE THE TABLE SCREEN</span>
+          <h2 id="quit-title">Quit to the main menu?</h2>
+          <p>Your seat and progress in room <strong>{room?.code}</strong> stay saved. Find it under <strong>Return to a table</strong> whenever you want to come back.</p>
+          <p className="quit-note">This does not end the match or skip your turn. Your table may still need your choices.</p>
+          <div className="quit-actions"><button autoFocus className="quiet" onClick={() => quitDialog.current?.close()}>Keep playing</button><button className="primary" disabled={busy} onClick={() => {quitDialog.current?.close();closeView();}}>Quit game</button></div>
+        </div>
+      </dialog>
       <dialog ref={rules} className="rules-dialog">
         <div className="modal">
           <div className="modal-head">
@@ -1717,6 +1751,7 @@ export default function Home() {
             to apply the displayed rules using shared controls. Automatic rules
             do not cover every interaction.
           </p>
+          <button className="primary wide" onClick={() => {rules.current?.close();setLearning(true);}}>Play the beginner tutorial →</button>
           <h3>Playing a turn</h3>
           <ol>
             <li>

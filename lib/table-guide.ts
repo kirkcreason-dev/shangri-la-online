@@ -1,6 +1,6 @@
 import type { Option } from "./rules/types.ts";
 type GuideRoom = {
-  status: string; phase: string; legacy?: boolean; me: string | null; control: string | null; turn: number;
+  status: string; phase: string; legacy?: boolean; endedByHost?: string; me: string | null; control: string | null; turn: number;
   players: {id: string; name: string; ready?: boolean; controller?: string; bot?: boolean}[];
   pendingCard?: {player: string} | null; itemPrompt?: {player: string} | null;
   endingPending?: string | null; decision?: {actor: string} | null; overflow?: {player: string} | null; ruling?: {actor: string} | null; penalty?: {winner: string} | null;
@@ -13,7 +13,7 @@ export function tableGuidance(room: GuideRoom) {
   const controlled = room.players.find(p => p.id === room.control);
   const result = (title: string, detail: string, attention = false, quick?: Option) => ({title, detail, attention, quick});
   if (room.legacy) return result("Saved table", "Open a new table to use the current rules.");
-  if (room.status === "finished") return result("Quest complete", "Your final board and game history are saved.");
+  if (room.status === "finished") return result(room.endedByHost ? "Game ended by the host" : "Quest complete", "Your final board and game history are saved.");
   if (room.status === "lobby") {
     const ready = room.players.filter(p => p.ready).length;
     return result("Gather your table", `${ready}/${room.players.length} ready · ${room.players.length < 2 ? "Invite a friend or add a practice opponent." : "Everyone must be ready before the host starts."}`);

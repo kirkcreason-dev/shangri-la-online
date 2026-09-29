@@ -71,3 +71,9 @@ GitHub Pages serves the game from the `gh-pages` branch, with the folder set to 
 The frontend connects to the existing live game API for room state and chat. Only `https://kirkcreason-dev.github.io` is allowed as a cross-origin browser client. Pages seats use a random browser-local token; the original game address retains its cookie sessions. Invitations preserve the Pages path. Database credentials and unrevealed game state remain on the server.
 
 `node tests/pages.integration.mjs` checks a production backend on port 4181, including cross-origin sessions, two-player chat, starting a game, and denied spectator/origin requests. `GAME_TEST_URL` can select another explicitly intended test target; this check creates a new test room.
+
+## Beginner tutorial and table controls
+
+Learn to play opens a two-minute interactive practice turn with a fixed roll, destination preview, Action card, weapon choice, combat reward, and end-turn step. It is browser-only and never sends game actions or changes a real room. The Basics tab explains the goal, stats, tolls, and how to resolve a waiting choice. Append `?tutorial=1` to the play URL to open it directly.
+
+Quit game returns to the menu while retaining the saved seat; it does not skip a turn. End game is a separate host-only action with confirmation. It finishes the table for all players without declaring a winner and preserves the final board and history. Finished games reject further actions.
