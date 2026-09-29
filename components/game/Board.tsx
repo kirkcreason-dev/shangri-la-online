@@ -1,4 +1,5 @@
 "use client";
+import { gameAsset } from "@/lib/client-connection";
 import board from "@/lib/board.json";
 import { GATES, REGIONS } from "@/lib/game";
 export { REGIONS } from "@/lib/game";
@@ -30,7 +31,7 @@ export default function Board({
     <div className="board-wrap">
       <div className="photo-board">
         <img
-          src="/board-reference.jpg"
+          src={gameAsset("board-reference.jpg")}
           alt="The Quest for Shangri-La original board reference photograph"
         />
         <svg

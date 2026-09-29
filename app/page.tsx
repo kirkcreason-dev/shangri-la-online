@@ -12,6 +12,7 @@ import {
   character as characterRecord,
 } from "@/lib/rules/catalog";
 import { RoomChat } from "@/components/game/RoomChat";
+import { gameFetch, gameBasePath, gameInvite } from "@/lib/client-connection";
 import type { Action, Player, State, Option } from "@/lib/rules/types";
 type PublicRoom = Omit<
   State,
@@ -55,7 +56,7 @@ type PublicRoom = Omit<
   space: { name: string; rules: string } | null;
 };
 async function api(path: string, data?: unknown) {
-  const r = await fetch(path, {
+  const r = await gameFetch(path, {
     method: data ? "POST" : "GET",
     headers: data ? { "Content-Type": "application/json" } : undefined,
     body: data ? JSON.stringify(data) : undefined,
@@ -899,7 +900,7 @@ export default function Home() {
     setConnection("");
     setError("");
     setToast("");
-    window.history.replaceState({}, "", "/");
+    window.history.replaceState({}, "", gameBasePath);
   }
   function move(region: number, pos: number) {
     action({ type: "move", region, pos, item: tollItem || undefined });
@@ -907,7 +908,7 @@ export default function Home() {
   async function copy() {
     try {
       await navigator.clipboard.writeText(
-        `${window.location.origin}/?room=${room?.code}`,
+        gameInvite(room!.code),
       );
       setToast("Invite link copied.");
     } catch {

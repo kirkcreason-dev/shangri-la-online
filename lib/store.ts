@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { isGameOrigin, remoteSession } from "./online/cors";
 import type { State } from "./game";
 import { FirestoreRooms } from "./online/firestore";
 import { ConflictError, OnlineError } from "./online/errors";
@@ -25,8 +26,9 @@ export function database() {
   return env.DB;
 }
 export async function session() {
+  const remote = remoteSession(await headers());
   const c = await cookies();
-  let token = c.get("qsl_session")?.value;
+  let token = remote ?? c.get("qsl_session")?.value;
   if (!token || !/^[a-f0-9]{64}$/.test(token)) {
     token = Array.from(crypto.getRandomValues(new Uint8Array(32)), (x) =>
       x.toString(16).padStart(2, "0"),
@@ -198,7 +200,7 @@ export function fail(e: unknown) {
 }
 export async function body(req: Request) {
   const origin = req.headers.get("origin");
-  if (origin && origin !== new URL(req.url).origin)
+  if (!isGameOrigin(origin, new URL(req.url).origin))
     throw new Error("This request must come from the game.");
   const raw = await req.text();
   if (raw.length > 8192) throw new Error("Request too large.");

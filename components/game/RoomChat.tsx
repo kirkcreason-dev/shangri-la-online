@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { gameFetch } from "@/lib/client-connection";
 import type { ChatMessage } from "@/lib/online/chat";
 type ChatResponse = { messages: ChatMessage[]; error?: string };
 export function RoomChat({ code, me }: { code: string; me: string | null }) {
@@ -34,7 +35,7 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
       if (running || document.hidden) return;
       running = true;
       try {
-        const r = await fetch(`/api/rooms/${code}/chat`, {
+        const r = await gameFetch(`/api/rooms/${code}/chat`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -89,7 +90,7 @@ export function RoomChat({ code, me }: { code: string; me: string | null }) {
         : { id: crypto.randomUUID(), text };
     retry.current = input;
     try {
-      const r = await fetch(`/api/rooms/${code}/chat`, {
+      const r = await gameFetch(`/api/rooms/${code}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
