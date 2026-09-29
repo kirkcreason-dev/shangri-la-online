@@ -22,6 +22,7 @@ type PublicRoom = Omit<
   | "boneDeck"
   | "boneDiscard"
   | "peek"
+  | "flow"
 > & {
   players: (Omit<Player, "session"> & {
     controller: string;
@@ -35,6 +36,11 @@ type PublicRoom = Omit<
       controller: string | null;
     }[];
   })[];
+  pendingCard: {
+    player: string;
+    message: string;
+    choices: { id: string; label: string }[];
+  } | null;
   peek: string | null;
   serverTime: number;
   me: string | null;
@@ -84,7 +90,7 @@ function CardView({ id, onUse }: { id: string; onUse?: (id: string) => void }) {
         <p className="small">Source uncertainty: {c.notes?.join(" ")}</p>
       )}
       <div className="row">
-        {onUse && (
+        {onUse && !c.automatic && (
           <button className="quiet" onClick={() => onUse(id)}>
             Use / resolve effect
           </button>
@@ -158,6 +164,9 @@ function CombatForm({
           {p.items
             .filter(
               (id) =>
+                ![...p.homies, ...p.bones].some((x) =>
+                  ["Officer Harry Cox", "Slippery Palms"].includes(cardName(x)),
+                ) &&
                 card(id).weapon &&
                 (!f.ranged || p.id !== f.attacker || card(id).ranged),
             )
@@ -227,8 +236,9 @@ function CombatForm({
       <details>
         <summary>Other card modifiers</summary>
         <p className="small">
-          Weapons and simple equipment bonuses are counted automatically. Add
-          only conditional card effects you have checked.
+          Equipment and supported Homie bonuses are counted automatically. Use
+          the Items & Homies buttons before locking your choice. Add a modifier
+          here only for an effect still marked for table controls.
         </p>
         <label>
           Additional combat modifier
@@ -252,6 +262,80 @@ function CombatForm({
       </details>
       <button className="primary" disabled={busy}>
         Lock choice & roll when ready
+      </button>
+    </form>
+  );
+}
+function TeleportForm({
+  room,
+  act,
+  busy,
+}: {
+  room: PublicRoom;
+  act: (a: Action) => void;
+  busy: boolean;
+}) {
+  const eligible = room.players.filter(
+    (p) =>
+      p.id !== room.itemPrompt?.player &&
+      !p.dead &&
+      !p.respawn &&
+      !(p.absentUntil && p.absentUntil > room.serverTime) &&
+      p.region !== 3,
+  );
+  const [target, setTarget] = useState(eligible[0]?.id ?? ""),
+    [region, setRegion] = useState(0),
+    [pos, setPos] = useState(0);
+  return (
+    <form
+      className="stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        act({ type: "item-teleport", target, region, pos });
+      }}
+    >
+      <h3>Milenko’s Hat · choose a destination</h3>
+      <label>
+        Player
+        <select value={target} onChange={(e) => setTarget(e.target.value)}>
+          {eligible.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Region
+        <select
+          value={region}
+          onChange={(e) => {
+            setRegion(Number(e.target.value));
+            setPos(0);
+          }}
+        >
+          {[...REGIONS, "Shangri-La"].map((name, i) => (
+            <option key={i} value={i}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Space
+        <select value={pos} onChange={(e) => setPos(Number(e.target.value))}>
+          {Array.from(
+            { length: region === 3 ? 1 : [28, 20, 12][region] },
+            (_, i) => (
+              <option key={i} value={i}>
+                {spaceName(region, i)}
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+      <button className="primary" disabled={busy || !target}>
+        Teleport player
       </button>
     </form>
   );
@@ -798,6 +882,8 @@ export default function Home() {
     [room.combat.attacker, room.combat.defender].includes(p.id);
   const canRule = room?.ruling && p && (room.ruling.actor === p.id || host);
   const canUse =
+    !room?.pendingCard &&
+    !room?.itemPrompt &&
     (myTurn || !!inCombat) &&
     !p?.absentUntil &&
     !me?.absentUntil &&
@@ -858,17 +944,19 @@ export default function Home() {
                   : "GATHER YOUR HOMIES"}
               </span>
               <h1>
-                {room?.legacy
-                  ? "Saved prototype table"
-                  : room?.status === "finished"
-                    ? "The quest is complete."
-                    : room?.status === "playing"
-                      ? myTurn
-                        ? p?.bot
-                          ? "Practice opponent’s choice."
-                          : "Your move."
-                        : `${active?.name}’s turn.`
-                      : "Your quest starts here."}
+                {room?.pendingCard
+                  ? `${room.players.find((p) => p.id === room.pendingCard!.player)?.name}’s card choice.`
+                  : room?.legacy
+                    ? "Saved prototype table"
+                    : room?.status === "finished"
+                      ? "The quest is complete."
+                      : room?.status === "playing"
+                        ? myTurn
+                          ? p?.bot
+                            ? "Practice opponent’s choice."
+                            : "Your move."
+                          : `${active?.name}’s turn.`
+                        : "Your quest starts here."}
               </h1>
             </div>
             <span className="table-note">
@@ -1269,50 +1357,78 @@ export default function Home() {
                         <p>{room.space.rules}</p>
                       </div>
                     )}
-                  {room.encounter && <CardView id={room.encounter} />}{" "}
-                  {myTurn && room.phase === "move" && (
-                    <>
-                      <p>Choose a highlighted destination.</p>
-                      {choices.some((d) => d.itemToll) && (
-                        <label>
-                          Item to pay at the Portal
-                          <select
-                            value={tollItem}
-                            onChange={(e) => setTollItem(e.target.value)}
-                          >
-                            <option value="">
-                              Choose only if crossing inward
-                            </option>
-                            {p?.items
-                              .filter((id) => !id.startsWith("ending-"))
-                              .map((id) => (
-                                <option key={id} value={id}>
-                                  {cardName(id)}
-                                </option>
-                              ))}
-                          </select>
-                        </label>
-                      )}
-                      <div className="actions">
-                        {choices.map((d, i) => (
-                          <button
-                            key={`${d.region}:${d.pos}:${i}`}
-                            disabled={busy || (d.itemToll && !tollItem)}
-                            onClick={() => move(d.region, d.pos)}
-                          >
-                            {spaceName(d.region, d.pos)}
-                            <span className="choice-detail">
-                              {REGIONS[d.region] ?? "Shangri-La"}
-                              {d.toll ? ` · $${d.toll}` : ""}
-                              {d.itemToll ? " · discard 1 Item" : ""}
-                              {d.reason ? ` · ${d.reason}` : ""}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </>
+                  {room.pendingCard && (
+                    <div className="notice" role="status">
+                      <h3>Card response</h3>
+                      <p>{room.pendingCard.message}</p>
+                      <p className="small">
+                        Waiting for{" "}
+                        {
+                          room.players.find(
+                            (x) => x.id === room.pendingCard!.player,
+                          )?.name
+                        }
+                        . The result will take effect after all card choices are
+                        resolved.
+                      </p>
+                    </div>
                   )}
-                  {inCombat && p && (
+                  {room.itemPrompt?.kind === "movement" && (
+                    <div className="notice">
+                      Choose one of the two movement dice below.
+                    </div>
+                  )}
+                  {room.itemPrompt?.kind === "teleport" &&
+                    p?.id === room.itemPrompt.player && (
+                      <TeleportForm room={room} act={action} busy={busy} />
+                    )}
+                  {room.encounter && <CardView id={room.encounter} />}{" "}
+                  {myTurn &&
+                    room.phase === "move" &&
+                    !room.pendingCard &&
+                    !room.itemPrompt && (
+                      <>
+                        <p>Choose a highlighted destination.</p>
+                        {choices.some((d) => d.itemToll) && (
+                          <label>
+                            Item to pay at the Portal
+                            <select
+                              value={tollItem}
+                              onChange={(e) => setTollItem(e.target.value)}
+                            >
+                              <option value="">
+                                Choose only if crossing inward
+                              </option>
+                              {p?.items
+                                .filter((id) => !id.startsWith("ending-"))
+                                .map((id) => (
+                                  <option key={id} value={id}>
+                                    {cardName(id)}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                        )}
+                        <div className="actions">
+                          {choices.map((d, i) => (
+                            <button
+                              key={`${d.region}:${d.pos}:${i}`}
+                              disabled={busy || (d.itemToll && !tollItem)}
+                              onClick={() => move(d.region, d.pos)}
+                            >
+                              {spaceName(d.region, d.pos)}
+                              <span className="choice-detail">
+                                {REGIONS[d.region] ?? "Shangri-La"}
+                                {d.toll ? ` · $${d.toll}` : ""}
+                                {d.itemToll ? " · discard 1 Item" : ""}
+                                {d.reason ? ` · ${d.reason}` : ""}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  {inCombat && p && !room.pendingCard && !room.itemPrompt && (
                     <CombatForm
                       key={JSON.stringify(room.combat?.choices)}
                       room={room}
@@ -1321,7 +1437,7 @@ export default function Home() {
                       busy={busy}
                     />
                   )}{" "}
-                  {canRule && p && (
+                  {canRule && p && !room.pendingCard && !room.itemPrompt && (
                     <TableControls
                       key={`${room.ruling?.reason}:${room.ruling?.actor}`}
                       room={room}
@@ -1638,9 +1754,9 @@ export default function Home() {
             trade consent, first-death replacement, Casket resurrection,
             Psychopathic Ring replacement before an ending resolves, nearby
             borrowed powers, Crystal Ball inspection, Bone conditions and the
-            ten ending structures. Check conditional Items, Homies and powers
-            before rolling: use the combat modifier and table controls where
-            needed.
+            ten ending structures. Supported Item and Homie effects offer
+            choices before rolls, Life loss and card draws. Use table controls
+            for cards still marked for manual resolution.
           </p>
           <h3>Timing at this table</h3>
           <p>
@@ -1649,7 +1765,11 @@ export default function Home() {
             turn direction reverses. King High Bone lasts ten real minutes,
             including time disconnected. Amputation limits capacity to three
             even with Backpack; Concussion clears on an unmodified movement
-            total of six. These resolve details the source cards leave unclear.
+            total of six. Reroll choices go to the roller first, then follow
+            lobby order; a replacement must be accepted. Card choices pause play
+            until the controlling seat answers. Noosawaa’s beneficial immunity
+            is applied automatically. These resolve details the source cards
+            leave unclear; conflicting card effects still need a table ruling.
           </p>
           <h3>Source limitations</h3>
           <p>

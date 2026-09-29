@@ -34,4 +34,12 @@ Rules edition 3 integrates Casket before ordinary death or inheritance, defers n
 
 The sources do not resolve every interaction. This table counts timed Bones over future full turns after applying them immediately, uses stable lobby order for the left-hand seat, gives Amputation's three-Item cap precedence over Backpack, and cures Concussion on an unmodified movement total of six. Borrowed powers are printed powers, not recursively borrowed copies. These conventions are shown in the game; they are not presented as verified publisher rulings.
 
-178 component records still require some table adjudication, including conditional Action cards and exceptional Item/Homie effects. Logged controls support cooperative play but are not a complete rules engine. Full release requires the missing inventory, remaining effects, and real multi-person acceptance playtesting.
+126 component records still require some table adjudication, including conditional Action cards and exceptional Item/Homie effects. Logged controls support cooperative play but are not a complete rules engine. Full release requires the missing inventory, remaining effects, and real multi-person acceptance playtesting.
+
+## Conditional Items and Homies update
+
+Core paths for 52 additional records are now automated, leaving 126 records marked for table adjudication. Bridget, Fat Tittie Kittie and Fat Sweaty Betty have female-Homie metadata based on explicit pronouns on their source cards. The uncertain card 3300 and Milenko's Hat remain marked for review; the latter opens a ruling after placing the target because its off-turn arrival sequence is not specified.
+
+Choices are recorded before bonuses, rerolls and Life-saving effects commit. The original action and private random tape replay with accepted choices; unfinished changes are not published to opponents. Reroll priority is the roller followed by stable lobby order, with the first replacement accepted. A pending response pauses the table, including practice opponents, whose choices belong to the host. Active Item buttons are available at safe action boundaries; exceptional simultaneous card conflicts still need the shared table controls. Noosawaa's beneficial immunity is applied automatically. These timing conventions are implementation choices, not verified publisher rulings.
+
+Dr. Dinglenut's creation count follows him on transfer. Borrowed Items retain their single-use marker through trades. Blow-up Doll can replace a required Homie discard; Rocket Launcher recoil resolves after the combat penalty and before victory is awarded. Tests cover these paths, but not every combination with conditional Fiends or endings.

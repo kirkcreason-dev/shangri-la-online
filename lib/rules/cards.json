@@ -94,7 +94,7 @@
     "rules": "Before rolling, pay $100 to add 2 to one Combat Roll. Pay separately for every combat in which you use this ability.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946338929045/C8B56A3B67E146E98B71CBF7DE56DA6D0A9CB42D/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -120,7 +120,7 @@
     "rules": "Before drawing a required Bone Card, roll a ten-sided die; a result of 4 or higher avoids drawing it.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946338932792/41C7E0AEE6448F57C283583BF5B64B33D5A7DBBA/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -146,7 +146,7 @@
     "rules": "Only Dark Carnival characters may recruit this Homie. Add 2 to your Combat Roll when fighting another player.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946338936002/8697354B3EDA22F08A3E5979E8F093BE0505ACD9/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "allegiance": "Dark Carnival"
@@ -218,7 +218,7 @@
     "rules": "Automatically defeat one Fiend you face without gaining Combat Bonus, then discard this Homie. Cannot be used in Shangri-La.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946338951800/12F632499ACBD2E23F16CE4491E79EFA9A69931B/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -245,7 +245,7 @@
     "rules": "In Detroit, roll two six-sided movement dice and choose either result.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946338956316/8935C1307193444682E2F6753DF6BE7666379B7B/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -288,7 +288,7 @@
     "rules": "Before rolling any six-sided die, you may choose to add 1 to its result; a natural 6 remains 6.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946338963807/0DFF2855FFBD45EDB36C1FDF6EE3A3297898061C/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -446,7 +446,7 @@
     "rules": "Only Dark Carnival characters may take this Item. Before any combat dice are rolled, choose to add 3 to one Combat Roll; discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339040099/8D2D2C7E1EDF876EC2C1B71EAB03C59FF09940FA/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "allegiance": "Dark Carnival"
@@ -503,7 +503,7 @@
     "rules": "Return this Homie to Psychopathic Records to gain $500, then discard him.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339369137/54A17BE55591B4A2EF64F8D7C3825565574BD1BE/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -558,7 +558,7 @@
     "rules": "You may sell this Item in Southwest for $400.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339391503/6CF125B27F1532FCAB69394896227004F4439777/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -752,7 +752,7 @@
     "rules": "You may sell this Item for $300 in Southwest.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339495252/7E15071ECC3589AD1AACE3513299A1C2EC287710/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -881,7 +881,7 @@
     "rules": "Hospital healing is free while you have this Item. Alternatively, discard this Item at the beginning of your turn to heal 1 Life.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339495252/7E15071ECC3589AD1AACE3513299A1C2EC287710/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -1096,7 +1096,7 @@
     "rules": "Whenever any die you roll is 1, you may reroll it once and must accept the second result.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339511288/E1048B71F3CB1FA978F8B66AD53CA4F07E98B0E4/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -1126,9 +1126,10 @@
     "rules": "Add 1 to your Combat Roll. During your turn, landing on a space with another player requires you to fight that player.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339511288/E1048B71F3CB1FA978F8B66AD53CA4F07E98B0E4/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
-    "notes": []
+    "notes": [],
+    "combat": 1
   },
   {
     "key": "a7916",
@@ -1376,7 +1377,7 @@
     "rules": "Whenever any die you roll is 1, you may reroll it once and must accept the second result.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339511288/E1048B71F3CB1FA978F8B66AD53CA4F07E98B0E4/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "duplicateOf": "a7913"
@@ -1408,10 +1409,11 @@
     "rules": "Add 1 to your Combat Roll. During your turn, landing on a space with another player requires you to fight that player.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339511288/E1048B71F3CB1FA978F8B66AD53CA4F07E98B0E4/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
-    "duplicateOf": "a7915"
+    "duplicateOf": "a7915",
+    "combat": 1
   },
   {
     "key": "a8016",
@@ -1577,7 +1579,7 @@
     "rules": "When you land on another player's space, you may take one of that player's Homies. Discard this Item after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339807235/91FEF9B40281F76ED80808A9360EA0550E12C0FC/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -1708,7 +1710,7 @@
     "rules": "Add 2 to Combat Rolls when making ranged attacks.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339807235/91FEF9B40281F76ED80808A9360EA0550E12C0FC/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -1802,7 +1804,7 @@
     "rules": "Only Nethervoid characters may take this Item. Use against another player in combat, except Mortal Combat, to win automatically; discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339850532/C070B1ED955C5FFC10FDF19CA74FE1B47C6386D7/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "allegiance": "Nethervoid"
@@ -1844,7 +1846,7 @@
     "rules": "Single-use Weapon: add 5 to a Combat Roll and permit ranged attacks. If used against a Fiend or player on your own space, you lose 1 Life after combat regardless of outcome. Discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339850532/C070B1ED955C5FFC10FDF19CA74FE1B47C6386D7/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "weapon": true,
@@ -1945,7 +1947,7 @@
     "rules": "Only Nethervoid characters may recruit this Homie. During your turn, when you land on another player's space, take one Homie of your choice from that player, then discard Preacherman.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339850532/C070B1ED955C5FFC10FDF19CA74FE1B47C6386D7/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "allegiance": "Nethervoid"
@@ -2000,7 +2002,7 @@
     "rules": "You may ignore any effect that would make you draw a Bone Card or lose a turn.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339856511/62D4D6ED87D4CBDC3862660CB32DD7CA51C43FF1/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2013,7 +2015,7 @@
     "rules": "While you have this Homie, you cannot use Weapons in combat. You may discard him by taking him to the Chaos District.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339856511/62D4D6ED87D4CBDC3862660CB32DD7CA51C43FF1/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2067,7 +2069,7 @@
     "rules": "When you would lose Life in combat, roll a ten-sided die; 8–10 prevents all Life loss. This protection does not kill Evil Dead, though other effects may kill him.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339856511/62D4D6ED87D4CBDC3862660CB32DD7CA51C43FF1/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2234,9 +2236,10 @@
     "rules": "When another player attacks you, except in Mortal Combat, you may make that combat a tie. This Homie then transfers to the attacking player.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339856511/62D4D6ED87D4CBDC3862660CB32DD7CA51C43FF1/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
-    "notes": []
+    "notes": [],
+    "female": true
   },
   {
     "key": "a8318",
@@ -2247,7 +2250,7 @@
     "rules": "In the Nethervoid, roll two six-sided dice for movement and choose either result.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339856511/62D4D6ED87D4CBDC3862660CB32DD7CA51C43FF1/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2379,7 +2382,7 @@
     "rules": "Only Nethervoid characters may recruit this Homie. At any time, sell any of your Items or Homies, including this Homie, for $100 each; discard sold cards.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339861336/448FF99D8C31E33BAFDB0D7E3A51C4CDC1AC6800/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "allegiance": "Nethervoid"
@@ -2393,7 +2396,7 @@
     "rules": "Use at the beginning of your turn to take three consecutive turns; discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339861336/448FF99D8C31E33BAFDB0D7E3A51C4CDC1AC6800/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2406,7 +2409,7 @@
     "rules": "Take any Item from the Purchase deck. An Item obtained this way is discarded after one use. You may invoke this ability three times before discarding this Homie.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339861336/448FF99D8C31E33BAFDB0D7E3A51C4CDC1AC6800/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2490,7 +2493,7 @@
     "rules": "Make another player draw a Bone Card; discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339861336/448FF99D8C31E33BAFDB0D7E3A51C4CDC1AC6800/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2603,7 +2606,7 @@
     "rules": "Return this Item to Oz to gain 1 Combat Bonus.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339916619/B1DF042C5D5784E56A11D62C95B27B79C705172E/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2658,7 +2661,7 @@
     "rules": "Force any player, including yourself, to discard a newly drawn Action Card and draw a replacement. Discard this Item afterward.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946339925289/774D33251710FD31D77DDF5B4426D86DE51AF44B/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2756,7 +2759,7 @@
     "rules": "Search any Action discard pile and take one Item, then discard this scroll.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340144115/6202734F112C7B7A76107F5ACBD02D99307F4FE3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2769,7 +2772,7 @@
     "rules": "While in the Dark Carnival, roll two six-sided movement dice and choose one result.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340144115/6202734F112C7B7A76107F5ACBD02D99307F4FE3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2795,7 +2798,7 @@
     "rules": "Optional use: roll a six-sided die. 1: lose all Cash; 2: discard all Homies; 3: discard all Items; 4: lose 2 Lives; 5: apply all four preceding penalties; 6: win the game. Discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340144115/6202734F112C7B7A76107F5ACBD02D99307F4FE3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2823,7 +2826,7 @@
     "rules": "Reroll any one die and accept the new result; discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340144115/6202734F112C7B7A76107F5ACBD02D99307F4FE3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2836,7 +2839,7 @@
     "rules": "Transfer a Bone Card you already have or have just drawn to another player; discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340144115/6202734F112C7B7A76107F5ACBD02D99307F4FE3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2919,7 +2922,7 @@
     "rules": "Transfer 1 Combat Bonus from another player to yourself; discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340144115/6202734F112C7B7A76107F5ACBD02D99307F4FE3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -2960,7 +2963,7 @@
     "rules": "Redirect a Fiend you are about to fight to another player. Cannot be used in Shangri-La or against a player there. After that combat, discard both the Fiend and this Item regardless of outcome.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340144115/6202734F112C7B7A76107F5ACBD02D99307F4FE3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -3084,9 +3087,10 @@
     "rules": "Add 2 to your Combat Roll. If you have or acquire a female Homie, discard both that Homie and Superballs.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340149576/EACE0637606D91CCCE526F03F0B3350F338D28D3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
-    "notes": []
+    "notes": [],
+    "combat": 2
   },
   {
     "key": "a10108",
@@ -3168,7 +3172,7 @@
     "rules": "Use and roll a six-sided die to teleport: 1 Clark Park; 2 Yellow Brick Alleyway; 3 Hell's Pit; 4 Fun House; 5 House of Horrors; 6 Shangri-La. Discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340149576/EACE0637606D91CCCE526F03F0B3350F338D28D3/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -3267,7 +3271,7 @@
     "rules": "Add 3 to Combat Rolls for ranged attacks only.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340154120/E77BA9C56B139FD1DAEE63285D0299750048A809/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "weapon": true,
@@ -3297,7 +3301,7 @@
     "rules": "Dark Carnival characters only: add 3 to Combat Rolls in Mortal Combat.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340154120/E77BA9C56B139FD1DAEE63285D0299750048A809/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "allegiance": "Dark Carnival"
@@ -3324,9 +3328,10 @@
     "rules": "Before rolling, choose to add 2 to one roll of any kind. Discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340154120/E77BA9C56B139FD1DAEE63285D0299750048A809/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
-    "notes": []
+    "notes": [],
+    "female": true
   },
   {
     "key": "a10206",
@@ -3367,7 +3372,7 @@
     "rules": "Only Dark Carnival characters may recruit this Homie. Add 3 to one Combat Roll, then discard.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340154120/E77BA9C56B139FD1DAEE63285D0299750048A809/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": [],
     "allegiance": "Dark Carnival"
@@ -3394,7 +3399,7 @@
     "rules": "When you would lose your last Life, you may discard this Homie instead.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340154120/E77BA9C56B139FD1DAEE63285D0299750048A809/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -3519,9 +3524,10 @@
     "rules": "While this Homie accompanies you, discard every other Homie you already have or acquire. Remove Betty by visiting Halls of Illusions or by acquiring Superballs; discard this card when removed.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340159989/9046F0A63896F3584288197DC0F509D831AB3DE6/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
-    "notes": []
+    "notes": [],
+    "female": true
   },
   {
     "key": "a10301",
@@ -3532,7 +3538,7 @@
     "rules": "Remove and discard every Bone Card affecting you, then discard this Item.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340159989/9046F0A63896F3584288197DC0F509D831AB3DE6/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -3588,7 +3594,7 @@
     "rules": "At the beginning of your turn, you may use this to restore all lost Lives, then discard it.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340159989/9046F0A63896F3584288197DC0F509D831AB3DE6/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -3644,7 +3650,7 @@
     "rules": "At the start of your turn, use this to take two consecutive turns. On both turns you may move to any space in any Region instead of normal movement. Discard after use.",
     "source": "https://cloud-3.steamusercontent.com/ugc/2180365946340159989/9046F0A63896F3584288197DC0F509D831AB3DE6/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "disposition": "keep",
     "notes": []
   },
@@ -3889,7 +3895,7 @@
     "rules": "When required to draw a Bone card, may first roll d10; on 4 or greater, prevent that draw.",
     "source": "https://cdn.steamusercontent.com/ugc/2180365946340460419/0C5BCF98B41074A7900CFF0940E62B709E9EB8B0/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "price": 300,
     "weapon": false,
     "ranged": false,
@@ -3907,7 +3913,7 @@
     "rules": "Choose before any movement dice to use two d6 and move by their sum. While doing so, do not use other movement-affecting Items, Homies, or character powers.",
     "source": "https://cdn.steamusercontent.com/ugc/2180365946340455834/41BC928C6AF42B5A5F2C5B08FBE52F80AD715934/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "price": 500,
     "weapon": false,
     "ranged": false,
@@ -3925,7 +3931,7 @@
     "rules": "Before rolling movement, may choose to move up to two spaces in either direction instead of making the usual movement roll.",
     "source": "https://cdn.steamusercontent.com/ugc/2180365946340455834/41BC928C6AF42B5A5F2C5B08FBE52F80AD715934/",
     "verified": true,
-    "automatic": false,
+    "automatic": true,
     "price": 1000,
     "weapon": false,
     "ranged": false,

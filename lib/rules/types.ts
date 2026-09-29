@@ -1,3 +1,4 @@
+import type { Flow } from "./reactions.ts";
 export type Region = 0 | 1 | 2 | 3;
 export type Allegiance = "Dark Carnival" | "Nethervoid";
 export type Kind =
@@ -76,6 +77,10 @@ export type Player = {
     string,
     { expiresAfterTurn?: number; branch?: "arm" | "leg"; controller?: string }
   >;
+  temporaryItems?: string[];
+  cardUses?: Record<string, number>;
+  wagonUntil?: number;
+  landed?: boolean;
   lootFor?: string;
   lootTurns?: number;
 };
@@ -105,6 +110,9 @@ export type Combat = {
   mortal: boolean;
   choices: Record<string, CombatChoice>;
   ending?: boolean;
+  redirectedBy?: string;
+  boosts?: Record<string, string[]>;
+  forceWinner?: string;
 };
 export type Penalty = {
   winner: string;
@@ -129,6 +137,16 @@ export type Ruling = {
 };
 export type State = {
   rulesVersion: 3;
+  flow?: Flow;
+  recoil?: { player: string; mortal: boolean }[];
+  pendingVictory?: string[];
+  itemPrompt?: {
+    player: string;
+    kind: "movement" | "teleport";
+    values?: number[];
+    raw?: number[];
+    returnPhase: State["phase"];
+  };
   direction?: number;
   code: string;
   status: "lobby" | "playing" | "finished";

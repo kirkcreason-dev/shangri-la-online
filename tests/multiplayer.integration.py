@@ -96,6 +96,23 @@ for count in [2,6]:
   current=read()['turn'];fixture(code,lambda s:s.update(phase='end',ruling=None,encounter=None,queue=[],choices=[]))
   action(current,type='end')
  p=read()['players'][active];assert (p['region'],p['pos'])==(0,9) and 'casketRecovery' not in p
+ # A two-person reaction remains saved while neither browser is connected.
+ other=(active+1)%count
+ def reaction_fixture(s):
+  s.update(turn=active,phase='roll',ruling=None,encounter=None,queue=[],choices=[],combat=None,penalty=None,overflow=None)
+  take(s,s['players'][active],'Behind the Paint');take(s,s['players'][other],'Toy Box')
+ fixture(code,reaction_fixture)
+ s=action(active,type='roll');assert s['pendingCard']['player']==actor and 'Before' in s['pendingCard']['message']
+ assert 'flow' not in s and 'flow' not in watcher.call(path)[1]
+ assert cs[other].call(path+'/action',{'type':'card-response','choice':'paint','version':s['rev']})[0]==400
+ s=action(active,type='card-response',choice='paint')
+ assert s['pendingCard']['player']==ids[other] and s['phase']=='roll'
+ saved=read(other);assert saved['pendingCard']==s['pendingCard'] and saved['control']==ids[other]
+ with concurrent.futures.ThreadPoolExecutor(2) as pool:
+  raced=list(pool.map(lambda _:cs[other].call(path+'/action',{'type':'card-response','choice':'toy','version':saved['rev']}),range(2)))
+ assert sorted(status for status,_ in raced)==[200,409],raced
+ s=read();assert s['pendingCard'] is None and s['phase']=='move' and 2<=s['roll']<=6
+ assert not any(cards[id.split('@')[0]]['name']=='Toy Box' for id in s['players'][other]['items'])
  # Scripted ending: enter, delay a lethal outcome, replace it and persist a winner.
  def ending_fixture(s):
   s.update(turn=active,phase='move',choices=[{'region':3,'pos':0,'toll':0}],ending='dimension',endingPool=['unveiling'],finalRevealed=False,finalEntered=False)
@@ -106,4 +123,4 @@ for count in [2,6]:
  for i in range(count):
   v=read(i);assert v['me']==ids[i] and v['winner']==actor and v['rev']==s['rev']
  assert watcher.call(path)[1]['winner']==actor
- print(json.dumps({'seats':count,'room':code,'result':'passed','checks':['independent sessions','private state','concurrent conflict','movement','delegated control','turn-based expiry','real-time expiry','Casket recovery','Ring replacement','persisted victory']}))
+ print(json.dumps({'seats':count,'room':code,'result':'passed','checks':['independent sessions','private state','concurrent conflict','movement','delegated control','turn-based expiry','real-time expiry','Casket recovery','persisted cross-player reactions','single-use response conflict','Ring replacement','persisted victory']}))

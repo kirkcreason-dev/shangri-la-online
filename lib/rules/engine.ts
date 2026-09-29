@@ -1,3 +1,4 @@
+import { ask, randomValue, transaction } from "./reactions.ts";
 import {
   absent,
   boneId,
@@ -39,12 +40,14 @@ export type * from "./types.ts";
 export function dice(sides = 6) {
   if (!Number.isInteger(sides) || sides < 2 || sides > 1000)
     throw new Error("Invalid die.");
-  const a = new Uint32Array(1),
-    max = Math.floor(4294967296 / sides) * sides;
-  do {
-    crypto.getRandomValues(a);
-  } while (a[0] >= max);
-  return (a[0] % sides) + 1;
+  return randomValue(sides, () => {
+    const a = new Uint32Array(1),
+      max = Math.floor(4294967296 / sides) * sides;
+    do {
+      crypto.getRandomValues(a);
+    } while (a[0] >= max);
+    return (a[0] % sides) + 1;
+  });
 }
 function shuffle<T>(a: T[]) {
   for (let i = a.length - 1; i > 0; i--) {
@@ -168,6 +171,12 @@ export function makeRoom(
   };
 }
 function win(s: State, winners: string[]) {
+  if (s.recoil?.length) {
+    s.pendingVictory = winners;
+    s.phase = "end";
+    s.combat = null;
+    return;
+  }
   s.status = "finished";
   s.winners = winners;
   s.winner = winners[0] ?? null;
@@ -210,11 +219,31 @@ function discard(s: State, id: string) {
   else if (c.deck === "bone") s.boneDiscard.push(id);
   else if (typeof c.deck === "number") s.discards[c.deck].push(id);
 }
-function removeCard(s: State, p: Player, id: string) {
+function removeCard(s: State, p: Player, id: string, protectHomie = true) {
+  const doll =
+    protectHomie && p.homies.includes(id) && !p.dead
+      ? heldId(p, "Blow-up Doll")
+      : undefined;
+  if (
+    doll &&
+    ask({
+      player: p.id,
+      message: `${cardName(id)} would be discarded.`,
+      choices: [
+        { id: "doll", label: "Discard Blow-up Doll instead" },
+        { id: "homie", label: `Discard ${cardName(id)}` },
+      ],
+    }) === "doll"
+  ) {
+    removeCard(s, p, doll);
+    addLog(s, `${p.name} protected ${cardName(id)} with Blow-up Doll.`);
+    return;
+  }
   for (const list of [p.items, p.homies, p.bones]) {
     const i = list.indexOf(id);
     if (i >= 0) {
       if (p.conditions) delete p.conditions[id];
+      p.temporaryItems = p.temporaryItems?.filter((x) => x !== id);
       list.splice(i, 1);
       discard(s, id);
       return;
@@ -223,7 +252,12 @@ function removeCard(s: State, p: Player, id: string) {
   throw new Error("That player does not hold this card.");
 }
 function loseAll(s: State, p: Player, what: "items" | "homies" | "bones") {
+  if (what === "homies") {
+    for (const id of [...p.homies]) removeCard(s, p, id);
+    return;
+  }
   for (const id of p[what]) discard(s, id);
+  if (what === "items") p.temporaryItems = [];
   p[what] = [];
   if (what === "bones") p.conditions = {};
 }
@@ -246,6 +280,7 @@ function receive(s: State, p: Player, id: string, homie = false) {
     return;
   }
   p[homie ? "homies" : "items"].push(id);
+  if (homie) resolveHomies(s, p);
 }
 function cb(p: Player, n: number) {
   p.bonus = Math.max(0, Math.min(25, p.bonus + n));
@@ -316,6 +351,138 @@ function death(s: State, p: Player, permanent = false, mortal = false) {
   if (s.endingHolder === p.id) s.endingHolder = null;
   addLog(s, `${p.name} (${previous}) is eliminated.`);
 }
+function heldId(p: Player, name: string) {
+  return [...p.items, ...p.homies, ...p.bones].find(
+    (id) => normalName(cardName(id)) === normalName(name),
+  );
+}
+function usedItem(s: State, p: Player, id: string) {
+  if (p.temporaryItems?.includes(id) && p.items.includes(id)) {
+    removeCard(s, p, id);
+    addLog(s, `${p.name}'s borrowed ${cardName(id)} returns after its use.`);
+  }
+}
+function playerDie(
+  s: State,
+  p: Player,
+  sides = 6,
+  combat = false,
+  restricted = false,
+) {
+  const paint =
+    !restricted && sides === 6 ? heldId(p, "Behind the Paint") : undefined;
+  const bridget = !restricted ? heldId(p, "Bridget") : undefined;
+  let boost = 0,
+    painted = false;
+  if (paint || bridget) {
+    const choice = ask({
+      player: p.id,
+      message: `Before ${p.name}'s d${sides} roll, choose any card bonus.`,
+      choices: [
+        { id: "none", label: "Roll without a card bonus" },
+        ...(paint
+          ? [
+              {
+                id: "paint",
+                label: "Behind the Paint · +1 (natural 6 stays 6)",
+              },
+            ]
+          : []),
+        ...(bridget
+          ? [{ id: "bridget", label: "Use Bridget · +2 and discard" }]
+          : []),
+        ...(paint && bridget
+          ? [{ id: "both", label: "Use Behind the Paint and Bridget" }]
+          : []),
+      ],
+    });
+    painted = choice === "paint" || choice === "both";
+    if (choice === "bridget" || choice === "both") {
+      removeCard(s, p, bridget!);
+      boost = 2;
+    }
+  }
+  let raw = dice(sides);
+  for (const owner of [p, ...s.players.filter((q) => q.id !== p.id)]) {
+    if (owner.dead || owner.respawn || absent(owner)) continue;
+    const ice =
+      owner.id === p.id &&
+      !restricted &&
+      raw === 1 &&
+      heldId(owner, "The Ice Man");
+    const toy =
+      owner.id === p.id && restricted ? undefined : heldId(owner, "Toy Box");
+    if (!ice && !toy) continue;
+    const choice = ask({
+      player: owner.id,
+      message: `${p.name} rolled ${raw} on d${sides}. Resolve any reroll before its effects.`,
+      choices: [
+        { id: "keep", label: `Keep ${raw}` },
+        ...(ice ? [{ id: "ice", label: "The Ice Man · reroll the 1" }] : []),
+        ...(toy
+          ? [{ id: "toy", label: "Use Toy Box · reroll and discard" }]
+          : []),
+      ],
+    });
+    if (choice !== "keep") {
+      if (choice === "toy") removeCard(s, owner, toy!);
+      raw = dice(sides);
+      addLog(
+        s,
+        `${owner.name} used ${choice === "ice" ? "The Ice Man" : "Toy Box"}: the new d${sides} result ${raw} must be accepted.`,
+      );
+      break;
+    }
+  }
+  if (painted) usedItem(s, p, paint!);
+  if (combat) p.boost += boost;
+  return {
+    raw,
+    value: raw + (painted && raw < 6 ? 1 : 0) + (combat ? 0 : boost),
+  };
+}
+function resolveHomies(s: State, p: Player) {
+  const superballs = heldId(p, "Superballs");
+  if (superballs) {
+    const female = p.homies.filter((id) => card(id).female);
+    if (female.length) {
+      for (const id of female) removeCard(s, p, id);
+      removeCard(s, p, superballs);
+    }
+  }
+  const betty = heldId(p, "Fat Sweaty Betty");
+  if (betty)
+    for (const id of [...p.homies]) if (id !== betty) removeCard(s, p, id);
+}
+function delivery(s: State, p: Player) {
+  const where = spaceName(p.region, p.pos);
+  for (const [name, at, reward] of [
+    ["Steve at the Office", "Psychopathic Records", "cash"],
+    ["Hype Engine", "Oz", "bonus"],
+    ["Officer Harry Cox", "Chaos District", "none"],
+    ["Fat Sweaty Betty", "Halls of Illusions", "none"],
+    ["Unclear title · card 3300", "Southwest", "none"],
+    ["Unclear title · card 3300", "Police Station", "none"],
+  ] as const) {
+    const id = heldId(p, name);
+    if (id && where === at) {
+      removeCard(s, p, id);
+      if (reward === "cash") gainCash(p, 500);
+      if (reward === "bonus") cb(p, 1);
+      addLog(s, `${p.name} resolved ${name} at ${at}.`);
+    }
+  }
+}
+function forcedAttack(s: State, p: Player) {
+  return (
+    p.landed &&
+    held(p, "2 Tuff Tony") &&
+    s.players.some(
+      (q) => q.id !== p.id && !q.dead && !q.respawn && !absent(q) && same(p, q),
+    )
+  );
+}
+
 function damage(
   s: State,
   p: Player,
@@ -324,10 +491,26 @@ function damage(
   permanent = false,
 ) {
   if (p.dead || p.respawn || absent(p)) return;
+  const jelly = heldId(p, "Jellynutz");
+  if (jelly && n >= p.life && !permanent) {
+    const choice = ask({
+      player: p.id,
+      message: `${p.name} would lose their last Life.`,
+      choices: [
+        { id: "save", label: "Discard Jellynutz · stay at 1 Life" },
+        { id: "lose", label: "Accept the Life loss" },
+      ],
+    });
+    if (choice === "save") {
+      removeCard(s, p, jelly);
+      p.life = 1;
+      return;
+    }
+  }
   p.life = Math.max(0, p.life - n);
   if (p.life > 0) return;
   if (!mortal && !permanent && has(s, p, "survive_last_life")) {
-    const r = dice(10);
+    const r = nonCombatDie(s, p, 10);
     addLog(s, `${p.name} rolled ${r} to survive.`);
     if (r >= 4) {
       p.life = 1;
@@ -343,10 +526,16 @@ function combatDamage(
   mortal = false,
   defense?: string | null,
 ) {
+  if (held(p, "Evil Dead")) {
+    const r = nonCombatDie(s, p, 10);
+    addLog(s, `${p.name} rolled ${r} for Evil Dead.`);
+    if (r >= 8) return false;
+  }
   if (defense && p.items.includes(defense) && card(defense).use === "armor") {
-    const r = dice(10);
+    const r = nonCombatDie(s, p, 10);
+    usedItem(s, p, defense);
     addLog(s, `${p.name} rolled ${r} for ${cardName(defense)}.`);
-    if (r === 1) removeCard(s, p, defense);
+    if (r === 1 && p.items.includes(defense)) removeCard(s, p, defense);
     if (r >= 8) return false;
   }
   damage(s, p, n, mortal);
@@ -368,8 +557,10 @@ function drawId(s: State, region: number | "bone") {
   need(s.decks[region].length, "No cards are available in this region.");
   return s.decks[region].pop()!;
 }
-function nonCombatDie(p: Player, sides = 6) {
-  return dice(sides) - (hasBone(p, "Random Bone Generator") ? 1 : 0);
+function nonCombatDie(s: State, p: Player, sides = 6) {
+  return (
+    playerDie(s, p, sides).value - (hasBone(p, "Random Bone Generator") ? 1 : 0)
+  );
 }
 function cureOnArrival(s: State, p: Player) {
   const name = spaceName(p.region, p.pos),
@@ -432,8 +623,37 @@ function drawBone(s: State, p: Player, bypassSkateboard = false) {
     s.phase = "decision";
     return;
   }
-  const id = drawId(s, "bone"),
-    name = cardName(id);
+  const id = drawId(s, "bone");
+  const morons = heldId(p, "Voodoo for Morons"),
+    others = s.players.filter(
+      (q) => q.id !== p.id && !q.dead && !q.respawn && !absent(q),
+    );
+  if (morons && others.length) {
+    const target = ask({
+      player: p.id,
+      message: `${p.name} drew ${cardName(id)}. Choose its recipient before it takes effect.`,
+      choices: [
+        { id: "keep", label: "Keep this Bone" },
+        ...others.map((q) => ({
+          id: q.id,
+          label: `Voodoo for Morons · transfer to ${q.name}`,
+        })),
+      ],
+    });
+    if (target !== "keep") {
+      removeCard(s, p, morons);
+      p = s.players.find((q) => q.id === target)!;
+    }
+  }
+  applyBone(s, p, id);
+}
+function applyBone(s: State, p: Player, id: string) {
+  if (has(s, p, "ignore_bones") || held(p, "Noosawaa")) {
+    discard(s, id);
+    addLog(s, `${p.name} ignored ${cardName(id)}.`);
+    return;
+  }
+  const name = cardName(id);
   p.conditions ??= {};
   if (name === "Random Bone Generator") {
     receive(s, p, id);
@@ -450,7 +670,7 @@ function drawBone(s: State, p: Player, bypassSkateboard = false) {
       p.conditions[id].controller =
         s.players[(s.players.indexOf(p) + 1) % s.players.length].id;
   } else if (name === "Amputation") {
-    const r = nonCombatDie(p);
+    const r = nonCombatDie(s, p);
     s.lastDice = [r];
     p.conditions[id] = { branch: r <= 3 ? "arm" : "leg" };
     addLog(
@@ -609,6 +829,15 @@ export function score(
   ))
     value += card(id).combat ?? 0;
   if (!suppress) for (const id of p.homies) value += card(id).combat ?? 0;
+  if (!suppress) {
+    if (opponent && p.allegiance === "Dark Carnival" && held(p, "Rude Boy"))
+      value += 2;
+    if (ranged && held(p, "The China Man")) value += 2;
+  }
+  if (mortal && held(p, "Iced-Out Charm") && p.allegiance === "Dark Carnival")
+    value += 3;
+  if (chosen && cardName(chosen) === "Ninja Detector Gun" && !ranged)
+    value -= card(chosen).combat ?? 0;
   if (s) {
     if (opponent && has(s, p, "player_combat_bonus")) value++;
     if (!opponent && finisher && has(s, p, "fiend_finishing_move")) value += 2;
@@ -697,6 +926,11 @@ function cardCombatEnd(
       );
     needsRuling = cards.some((id) => !card(id).automatic);
   }
+  if (fight.redirectedBy && result !== "win")
+    for (const id of cards) {
+      removeBoard(s, [id]);
+      discard(s, id);
+    }
   s.combat = null;
   s.encounter = null;
   s.queue = [];
@@ -716,9 +950,9 @@ function rollCombat(s: State) {
     q = f.defender ? s.players.find((p) => p.id === f.defender) : undefined;
   const a = f.choices[p.id],
     b = q ? f.choices[q.id] : undefined;
-  const r = dice(10),
-    t = q ? dice(10) : 0;
-  s.lastDice = q ? [r, t] : [r];
+  const r = f.forceWinner ? 0 : playerDie(s, p, 10, true).raw,
+    t = q && !f.forceWinner ? playerDie(s, q, 10, true).raw : 0;
+  s.lastDice = f.forceWinner ? [] : q ? [r, t] : [r];
   const effective = (p: Player, r: number, w: string | null) =>
     has(s, p, "combat_nine_as_ten") && r === 9
       ? 10
@@ -777,6 +1011,7 @@ function rollCombat(s: State) {
     has(s, p, "defeat_police")
   )
     diff = 1;
+  if (f.forceWinner) diff = f.forceWinner === p.id ? 1 : -1;
   if (q && (hasBone(p, "Insanity") || hasBone(q, "Insanity")))
     diff =
       hasBone(p, "Insanity") && hasBone(q, "Insanity")
@@ -797,17 +1032,32 @@ function rollCombat(s: State) {
   ] as const) {
     if (!player || !choice) continue;
     player.boost = 0;
-    if (choice.weapon && card(choice.weapon).breakOnOne && raw === 1) {
+    if (!f.forceWinner && choice.weapon) {
+      if (cardName(choice.weapon) === "Rocket Launcher") {
+        removeCard(s, player, choice.weapon);
+        if (!f.ranged)
+          (s.recoil ??= []).push({ player: player.id, mortal: f.mortal });
+      } else usedItem(s, player, choice.weapon);
+    }
+    if (
+      choice.weapon &&
+      player.items.includes(choice.weapon) &&
+      card(choice.weapon).breakOnOne &&
+      raw === 1
+    ) {
       removeCard(s, player, choice.weapon);
       addLog(s, `${player.name}'s ${cardName(choice.weapon)} broke.`);
     }
   }
   addLog(
     s,
-    q
-      ? `${p.name}: ${r}+${pv}; ${q.name}: ${t}+${qv}. ${diff === 0 ? "Tie." : `${diff > 0 ? p.name : q.name} wins combat.`}`
-      : `${p.name}: ${r}+${pv} against ${strength}. ${diff > 0 ? "Win." : diff < 0 ? "Loss." : "Tie."}`,
+    f.forceWinner
+      ? `${s.players.find((p) => p.id === f.forceWinner)!.name} used Mr. Johnson's Head. ${diff === 0 ? "Tie after combat restrictions." : `${diff > 0 ? p.name : q!.name} wins combat.`}`
+      : q
+        ? `${p.name}: ${r}+${pv}; ${q.name}: ${t}+${qv}. ${diff === 0 ? "Tie." : `${diff > 0 ? p.name : q.name} wins combat.`}`
+        : `${p.name}: ${r}+${pv} against ${strength}. ${diff > 0 ? "Win." : diff < 0 ? "Loss." : "Tie."}`,
   );
+  f.boosts = {};
   if (f.ending) {
     endingCombat(s, p, diff);
     return;
@@ -948,9 +1198,8 @@ function enterEnding(s: State, p: Player) {
       const living = s.players.filter(
         (p) => !p.dead && !p.respawn && !absent(p),
       );
-      const rolls = living.map((p) => ({ p, r: dice() }));
-      for (const roll of rolls)
-        if (hasBone(roll.p, "Random Bone Generator")) roll.r--;
+      const rolls = living.map((p) => ({ p, r: nonCombatDie(s, p) }));
+
       if (rolls.some(({ r }) => r === 0)) {
         ruling(
           s,
@@ -1021,7 +1270,7 @@ function endingTurn(s: State, p: Player) {
     else s.phase = "end";
   } else if (s.ending === "wraith") {
     const count = s.endingProgress[p.id] ?? 0,
-      r = nonCombatDie(p);
+      r = nonCombatDie(s, p);
     s.lastDice = [r];
     addLog(s, `${p.name} rolled ${r}+${count} against The Wraith.`);
     if (r + count >= 6) win(s, [p.id]);
@@ -1035,6 +1284,8 @@ function endingTurn(s: State, p: Player) {
 }
 function arrive(s: State, p: Player) {
   cureOnArrival(s, p);
+  delivery(s, p);
+  p.landed = true;
   if (p.region === 3) {
     enterEnding(s, p);
     return;
@@ -1067,6 +1318,7 @@ function arrive(s: State, p: Player) {
 function startTurn(s: State) {
   const p = current(s);
   p.used = [];
+  p.landed = false;
   p.boost = 0;
   s.trade = null;
   s.roll = null;
@@ -1077,6 +1329,7 @@ function startTurn(s: State) {
   s.wonFiend = false;
   s.peek = null;
   s.turnsTaken[p.id] = (s.turnsTaken[p.id] ?? 0) + 1;
+  if ((p.wagonUntil ?? Infinity) < s.turnsTaken[p.id]) delete p.wagonUntil;
   if (p.respawn) {
     Object.assign(
       p,
@@ -1166,8 +1419,16 @@ function transfer(
     !c?.allegiance || c.allegiance === to.allegiance,
     "That allegiance cannot keep this card.",
   );
+  const uses = from.cardUses?.[id];
+  if (uses !== undefined) {
+    (to.cardUses ??= {})[id] = uses;
+    delete from.cardUses![id];
+  }
+  const temporary = from.temporaryItems?.includes(id);
+  from.temporaryItems = from.temporaryItems?.filter((x) => x !== id);
   from[key] = from[key].filter((x) => x !== id);
   receive(s, to, id, homie);
+  if (temporary && to.items.includes(id)) (to.temporaryItems ??= []).push(id);
   if (id.startsWith("ending-")) s.endingHolder = to.id;
   overflow(s, to);
 }
@@ -1238,14 +1499,34 @@ function acquire(s: State, p: Player, id: string) {
   if (c.kind === "cash") {
     p.cash += c.cash ?? 0;
     discard(s, id);
-  } else if (c.kind === "homie") p.homies.push(id);
+  } else if (c.kind === "homie") receive(s, p, id, true);
   else if (c.kind === "bone") p.bones.push(id);
   else p.items.push(id);
   checkLoophole(s, p);
 }
 function drawAction(s: State, p: Player, region = p.region) {
   need(region >= 0 && region < 3, "Choose an Action deck.");
-  const id = drawId(s, region);
+  let id = drawId(s, region);
+  for (const owner of [p, ...s.players.filter((q) => q.id !== p.id)]) {
+    if (owner.dead || owner.respawn || absent(owner)) continue;
+    const hat = heldId(owner, "The Witch's Hat");
+    if (!hat) continue;
+    if (
+      ask({
+        player: owner.id,
+        message: `${p.name} just drew ${cardName(id)}.`,
+        choices: [
+          { id: "keep", label: "Keep the drawn card" },
+          { id: "replace", label: "Use The Witch's Hat · discard and replace" },
+        ],
+      }) === "replace"
+    ) {
+      removeCard(s, owner, hat);
+      discard(s, id);
+      id = drawId(s, region);
+      addLog(s, `${owner.name} replaced the Action draw with The Witch's Hat.`);
+    }
+  }
   s.board[`${p.region}:${p.pos}`] ??= [];
   s.board[`${p.region}:${p.pos}`].push(id);
   s.encounter = id;
@@ -1288,7 +1569,7 @@ function boardEffects(s: State, p: Player, effects: any[], bonus = 0) {
         );
         break;
       case "roll_table": {
-        const r = nonCombatDie(p) + bonus;
+        const r = nonCombatDie(s, p) + bonus;
         s.lastDice = [r];
         addLog(s, `${spaceName(p.region, p.pos)}: ${p.name} rolled ${r}.`);
         const row = e.outcomes.find((x: any) =>
@@ -1370,8 +1651,8 @@ function combatChoice(s: State, p: Player, a: Action) {
     "Choose a Weapon you hold.",
   );
   need(
-    !weapon || !held(p, "Slippery Palms"),
-    "Slippery Palms prevents Weapon use.",
+    !weapon || (!held(p, "Slippery Palms") && !held(p, "Officer Harry Cox")),
+    "Slippery Palms or Officer Harry Cox prevents Weapon use.",
   );
   need(
     !f.ranged || p.id !== f.attacker || (weapon && card(weapon).ranged),
@@ -1425,6 +1706,469 @@ function combatChoice(s: State, p: Player, a: Action) {
   if (f.choices[f.attacker] && (!f.defender || f.choices[f.defender]))
     rollCombat(s);
 }
+function possessionOptions(s: State, p: Player): Option[] {
+  if (
+    s.status !== "playing" ||
+    p.dead ||
+    p.respawn ||
+    absent(p) ||
+    s.flow ||
+    s.itemPrompt ||
+    s.decision ||
+    s.endingPending
+  )
+    return [];
+  const own = current(s).id === p.id,
+    free =
+      own && ["roll", "move", "encounter", "end", "ending"].includes(s.phase);
+  const f = s.combat,
+    combat = !!f && [f.attacker, f.defender].includes(p.id) && !f.choices[p.id];
+  const other = s.players.filter(
+    (q) => q.id !== p.id && !q.dead && !q.respawn && !absent(q),
+  );
+  const out: Option[] = [];
+  const add = (id: string, label: string, rest: Partial<Action> = {}) =>
+    out.push({
+      label,
+      action: { type: "item-use", item: id, ...rest },
+      group: "Items & Homies",
+    });
+  for (const id of [...p.items, ...p.homies]) {
+    if (id.startsWith("ending-")) continue;
+    const n = cardName(id);
+    if (card(id).allegiance && card(id).allegiance !== p.allegiance) continue;
+    if (combat) {
+      if (
+        n === "Spider" &&
+        p.cash >= 100 &&
+        !f!.boosts?.[p.id]?.includes("Spider")
+      )
+        add(id, "Spider · pay $100 for +2");
+      if (n === "Face Paint" || n === "Ghost of Dolemite")
+        add(id, `Use ${n} · +3 and discard`);
+      if (
+        n === "Mr. Johnson's Head" &&
+        f!.defender &&
+        !f!.mortal &&
+        !f!.forceWinner
+      )
+        add(id, `Use ${n} · automatic win`);
+      if (n === "Fat Tittie Kittie" && f!.defender === p.id && !f!.mortal)
+        add(id, "Fat Tittie Kittie · tie and transfer");
+      if (
+        n === "The Human Highlight Reel" &&
+        !f!.defender &&
+        !f!.ending &&
+        f!.cards.length === 1
+      )
+        add(id, "Human Highlight Reel · defeat Fiend without reward");
+      if (
+        n === "The Green Book" &&
+        !f!.defender &&
+        !f!.ending &&
+        f!.cards.length === 1
+      )
+        for (const q of other.filter((q) => q.region !== 3))
+          add(id, `The Green Book · redirect Fiend to ${q.name}`, {
+            target: q.id,
+          });
+    }
+    if (
+      n === "Masked Negotiator" &&
+      [
+        "roll",
+        "move",
+        "encounter",
+        "end",
+        "overflow",
+        "combat",
+        "penalty",
+        "ruling",
+        "ending",
+      ].includes(s.phase)
+    )
+      for (const sale of [...p.items, ...p.homies].filter(
+        (id) => !protectedItem(p, id),
+      ))
+        add(id, `Sell ${cardName(sale)} · $100`, { choice: sale });
+    if (!free) continue;
+    if (s.phase === "roll") {
+      if (
+        ["Health Insurance Card", "The Book of Life"].includes(n) &&
+        p.life < p.maxLife
+      )
+        add(id, `Use ${n} · heal and discard`);
+      if (n === "Morton's List" || n === "Wagon")
+        add(id, `Use ${n} · consecutive turns`);
+      if (
+        n === "’84 Regal" &&
+        !held(p, "Unclear title · card 3300") &&
+        p.region < 3
+      )
+        add(id, "’84 Regal · move 1 or 2 spaces");
+    }
+    if (["Circus Tent", "Milenko's Hat", "The Cryptic List"].includes(n))
+      add(id, `Use ${n} · roll d6`);
+    if (
+      n === "Cotton Candy" &&
+      [...p.bones, ...p.items.filter((x) => card(x).deck === "bone")].length
+    )
+      add(id, "Cotton Candy · remove all Bones");
+    if (n === "Mirror Mirror")
+      for (const q of other.filter((q) => q.bonus > 0))
+        add(id, `Mirror Mirror · take 1 base CB from ${q.name}`, {
+          target: q.id,
+        });
+    if (n === "Voodoo Doll")
+      for (const q of other)
+        add(id, `Voodoo Doll · ${q.name} draws a Bone`, { target: q.id });
+    if (n === "Voodoo for Morons")
+      for (const bone of [
+        ...p.bones,
+        ...p.items.filter((x) => card(x).deck === "bone"),
+      ])
+        for (const q of other)
+          add(id, `Transfer ${cardName(bone)} to ${q.name}`, {
+            choice: bone,
+            target: q.id,
+          });
+    if (n === "Twilight Scroll")
+      for (const take of s.discards
+        .flat()
+        .filter((x) => card(x).kind === "item"))
+        add(id, `Twilight Scroll · take ${cardName(take)}`, { choice: take });
+    if (n === "Dr. Dinglenut" && (p.cardUses?.[id] ?? 0) < 3)
+      for (const take of s.purchase.filter(
+        (x, i, a) => a.findIndex((y) => card(y).key === card(x).key) === i,
+      ))
+        add(id, `Dr. Dinglenut · borrow ${cardName(take)}`, { choice: take });
+    if (
+      ["PuBu Gear", "Preacherman"].includes(n) &&
+      p.landed &&
+      s.phase === "encounter" &&
+      !s.encounter &&
+      !s.locationDone
+    )
+      for (const q of other.filter((q) => same(p, q)))
+        for (const homie of q.homies.filter(
+          (h) => !card(h).allegiance || card(h).allegiance === p.allegiance,
+        ))
+          add(id, `${n} · take ${cardName(homie)} from ${q.name}`, {
+            target: q.id,
+            choice: homie,
+          });
+    const at = spaceName(p.region, p.pos);
+    if (
+      (n === "Steve at the Office" && at === "Psychopathic Records") ||
+      (n === "Hype Engine" && at === "Oz") ||
+      (n === "Officer Harry Cox" && at === "Chaos District") ||
+      (n === "Fat Sweaty Betty" && at === "Halls of Illusions")
+    )
+      add(id, `Resolve ${n} here`);
+  }
+  return out;
+}
+function possessionAction(s: State, p: Player, a: Action) {
+  need(
+    possessionOptions(s, p).some((o) =>
+      Object.entries(o.action).every(([k, v]) => (a as any)[k] === v),
+    ),
+    "That card cannot be used at this time or on that target.",
+  );
+  const id = a.item!,
+    name = cardName(id),
+    q = a.target ? playerById(s, a.target) : undefined;
+  const consume = () => {
+    if ([...p.items, ...p.homies].includes(id)) removeCard(s, p, id);
+  };
+  const f = s.combat;
+  switch (name) {
+    case "Spider":
+      pay(p, 100);
+      p.boost += 2;
+      (f!.boosts ??= {})[p.id] = [...(f!.boosts?.[p.id] ?? []), "Spider"];
+      break;
+    case "Face Paint":
+    case "Ghost of Dolemite":
+      p.boost += 3;
+      consume();
+      break;
+    case "Mr. Johnson's Head":
+      f!.forceWinner = p.id;
+      consume();
+      break;
+    case "Fat Tittie Kittie":
+      transfer(s, p, s.players.find((q) => q.id === f!.attacker)!, id, true);
+      s.combat = null;
+      s.phase = "end";
+      break;
+    case "The Human Highlight Reel": {
+      const fiends = [...f!.cards];
+      for (const c of fiends) {
+        removeBoard(s, [c]);
+        discard(s, c);
+      }
+      consume();
+      s.combat = null;
+      s.encounter = null;
+      s.queue = [];
+      s.phase = "end";
+      if (fiends.some((c) => !card(c).automatic))
+        ruling(
+          s,
+          p,
+          fiends,
+          "The Human Highlight Reel defeated this Fiend without Combat Bonus. Apply any remaining printed defeat effect.",
+        );
+      break;
+    }
+    case "The Green Book": {
+      const cards = [...f!.cards],
+        at = { region: f!.region, pos: f!.pos };
+      consume();
+      combatStart(s, q!, cards, undefined, false, false, at);
+      s.combat!.redirectedBy = p.id;
+      break;
+    }
+    case "Masked Negotiator":
+      removeCard(s, p, a.choice!);
+      gainCash(p, 100);
+      if (s.overflow?.player === p.id && p.items.length <= capacity(p)) {
+        s.phase = s.overflow.returnPhase;
+        s.overflow = null;
+      }
+      break;
+    case "Health Insurance Card":
+      heal(p, 1);
+      consume();
+      break;
+    case "The Book of Life":
+      heal(p, p.maxLife);
+      consume();
+      break;
+    case "Morton's List":
+      p.extraTurns += 2;
+      consume();
+      break;
+    case "Wagon":
+      p.extraTurns++;
+      p.wagonUntil = (s.turnsTaken[p.id] ?? 0) + 1;
+      consume();
+      break;
+    case "’84 Regal":
+      s.choices = [...destinations(p, 1, s), ...destinations(p, 2, s)].filter(
+        (d, i, a) =>
+          a.findIndex((x) => x.region === d.region && x.pos === d.pos) === i,
+      );
+      s.phase = "move";
+      usedItem(s, p, id);
+      break;
+    case "Cotton Candy":
+      for (const bone of [
+        ...p.bones,
+        ...p.items.filter((x) => card(x).deck === "bone"),
+      ])
+        removeCard(s, p, bone);
+      consume();
+      break;
+    case "Mirror Mirror":
+      cb(q!, -1);
+      cb(p, 1);
+      consume();
+      break;
+    case "Voodoo Doll":
+      consume();
+      drawBone(s, q!);
+      break;
+    case "Voodoo for Morons": {
+      const bone = a.choice!,
+        condition = p.conditions?.[bone];
+      removeCard(s, p, bone);
+      s.boneDiscard = s.boneDiscard.filter((x) => x !== bone);
+      consume();
+      if (has(s, q!, "ignore_bones") || held(q!, "Noosawaa")) discard(s, bone);
+      else {
+        q![card(bone).kind === "item" ? "items" : "bones"].push(bone);
+        if (condition) {
+          const copy = { ...condition };
+          if (copy.expiresAfterTurn !== undefined)
+            copy.expiresAfterTurn =
+              (s.turnsTaken[q!.id] ?? 0) +
+              Math.max(0, copy.expiresAfterTurn - (s.turnsTaken[p.id] ?? 0));
+          if (copy.controller)
+            copy.controller =
+              s.players[(s.players.indexOf(q!) + 1) % s.players.length].id;
+          (q!.conditions ??= {})[bone] = copy;
+        }
+        overflow(s, q!);
+      }
+      break;
+    }
+    case "Twilight Scroll":
+      s.discards = s.discards.map((d) => d.filter((x) => x !== a.choice));
+      consume();
+      receive(s, p, a.choice!);
+      overflow(s, p);
+      break;
+    case "Dr. Dinglenut":
+      s.purchase = s.purchase.filter((x) => x !== a.choice);
+      receive(s, p, a.choice!);
+      if (p.items.includes(a.choice!))
+        (p.temporaryItems ??= []).push(a.choice!);
+      p.cardUses ??= {};
+      p.cardUses[id] = (p.cardUses[id] ?? 0) + 1;
+      if (p.cardUses[id] >= 3) consume();
+      overflow(s, p);
+      break;
+    case "PuBu Gear":
+    case "Preacherman":
+      transfer(s, q!, p, a.choice!, true);
+      consume();
+      break;
+    case "Steve at the Office":
+    case "Hype Engine":
+    case "Officer Harry Cox":
+    case "Fat Sweaty Betty":
+      delivery(s, p);
+      break;
+    case "Circus Tent": {
+      const r = nonCombatDie(s, p);
+      s.lastDice = [r];
+      consume();
+      if (r === 6) {
+        win(s, [p.id]);
+        break;
+      }
+      if (r === 1 || r === 5) p.cash = 0;
+      if (r === 2 || r === 5) loseAll(s, p, "homies");
+      if (r === 3 || r === 5) loseAll(s, p, "items");
+      if (r === 4 || r === 5) damage(s, p, 2);
+      if (r < 1 || r > 6)
+        ruling(
+          s,
+          p,
+          [],
+          `Circus Tent has no printed result for modified roll ${r}. Resolve with the table.`,
+        );
+      break;
+    }
+    case "The Cryptic List": {
+      const r = nonCombatDie(s, p);
+      s.lastDice = [r];
+      consume();
+      const names = [
+        "Clark Park",
+        "Yellow Brick Alleyway",
+        "Hell's Pit",
+        "Fun House",
+        "House of Horrors",
+      ];
+      if (r >= 1 && r <= 6) {
+        Object.assign(
+          p,
+          r === 6 ? { region: 3, pos: 0 } : findSpace(names[r - 1]),
+        );
+        s.encounter = null;
+        s.queue = [];
+        s.locationDone = false;
+        arrive(s, p);
+      } else
+        ruling(
+          s,
+          p,
+          [],
+          `The Cryptic List has no printed result for modified roll ${r}. Resolve with the table.`,
+        );
+      break;
+    }
+    case "Milenko's Hat": {
+      const r = nonCombatDie(s, p);
+      s.lastDice = [r];
+      consume();
+      if (r >= 1 && r <= 2) damage(s, p, 1);
+      else if (r <= 4 && r >= 3) cb(p, 1);
+      else if (r === 5 || r === 6) {
+        if (
+          s.players.some(
+            (q) =>
+              q.id !== p.id &&
+              !q.dead &&
+              !q.respawn &&
+              !absent(q) &&
+              q.region !== 3,
+          )
+        )
+          s.itemPrompt = {
+            player: p.id,
+            kind: "teleport",
+            returnPhase: s.phase,
+          };
+        else addLog(s, "No eligible Milenko’s Hat target remains.");
+      } else
+        ruling(
+          s,
+          p,
+          [],
+          `Milenko's Hat has no printed result for modified roll ${r}. Resolve with the table.`,
+        );
+      break;
+    }
+    default:
+      throw Error("This card has no automated action.");
+  }
+  if (p.respawn || p.dead) {
+    if (current(s).id === p.id) s.phase = "end";
+  }
+  addLog(s, `${p.name} used ${name}.`);
+  checkLoophole(s, p);
+  endCheck(s);
+}
+function prepareMovement(
+  s: State,
+  p: Player,
+  raw: number,
+  total: number,
+  power = true,
+) {
+  if (raw === 6) {
+    const concussion = boneId(p, "Concussion");
+    if (concussion) removeCard(s, p, concussion);
+  }
+  s.roll = Math.max(1, total - movementPenalty(p));
+  s.choices = destinations(p, s.roll, s);
+  if (power && s.roll === 6) {
+    if (has(s, p, "movement_six_teleport"))
+      for (let pos = 0; pos < COUNTS[p.region]; pos++)
+        s.choices.push({
+          region: p.region,
+          pos,
+          toll: 0,
+          reason: "Magic Ninja",
+        });
+    if (has(s, p, "movement_six_visit_player"))
+      for (const q of s.players.filter(
+        (q) =>
+          q.id !== p.id &&
+          !q.dead &&
+          !q.respawn &&
+          !absent(q) &&
+          q.region !== 3,
+      ))
+        s.choices.push({
+          region: q.region,
+          pos: q.pos,
+          toll: 0,
+          reason: "Monoxide",
+        });
+  }
+  s.choices = [
+    ...new Map(
+      s.choices.map((d) => [`${d.region}:${d.pos}:${d.itemToll ?? false}`, d]),
+    ).values(),
+  ];
+  s.phase = s.choices.length ? "move" : "end";
+}
+
 function powerAction(s: State, p: Player, a: Action) {
   const key = a.power!;
   need(has(s, p, key), "This power is unavailable.");
@@ -1498,7 +2242,7 @@ function powerAction(s: State, p: Player, a: Action) {
         );
       {
         const r = ["steal_item", "steal_homie"].includes(key)
-          ? nonCombatDie(p, 10)
+          ? nonCombatDie(s, p, 10)
           : 10;
         addLog(s, `${p.name}: ${key.replaceAll("_", " ")} ${r}.`);
         if (r >= 8)
@@ -1577,7 +2321,7 @@ function powerAction(s: State, p: Player, a: Action) {
     case "fiend_victory_extra_turn":
       need(s.wonFiend, "Defeat a Fiend first.");
       {
-        const r = nonCombatDie(p, 10);
+        const r = nonCombatDie(s, p, 10);
         s.lastDice = [r];
         if (r >= 6) p.extraTurns++;
         p.used.push(key);
@@ -1588,7 +2332,7 @@ function powerAction(s: State, p: Player, a: Action) {
       need(a.item && p.homies.includes(a.item), "Choose a Homie.");
       removeCard(s, p, a.item!);
       {
-        const r = nonCombatDie(p);
+        const r = nonCombatDie(s, p);
         s.lastDice = [r];
         gainCash(p, Math.ceil(r / 2) * 100);
       }
@@ -1599,7 +2343,7 @@ function powerAction(s: State, p: Player, a: Action) {
         "Choose another player sharing your space.",
       );
       {
-        const r = nonCombatDie(p, 10);
+        const r = nonCombatDie(s, p, 10);
         s.lastDice = [r];
         if (r >= 6) {
           q!.lootFor = p.id;
@@ -1755,6 +2499,72 @@ function applyRuling(s: State, actor: Player, a: Action) {
   endCheck(s);
 }
 export function applyAction(s: State, actorId: string, a: Action) {
+  if (s.flow) {
+    const flow = structuredClone(s.flow),
+      p = s.players.find((p) => p.id === flow.prompt.player),
+      auth = s.players.find((p) => p.id === actorId);
+    need(
+      a.type === "card-response" &&
+        p &&
+        auth &&
+        !absent(auth) &&
+        canControl(s, actorId, p),
+      "Finish the pending card choice with its controlling player.",
+    );
+    need(
+      flow.prompt.choices.some((c) => c.id === a.choice),
+      "Choose one of the displayed responses.",
+    );
+    flow.answers.push(a.choice!);
+    transaction(
+      s,
+      flow.actor,
+      flow.action,
+      () => {
+        applyCore(s, flow.actor, flow.action);
+        finishCombatCosts(s);
+      },
+      flow,
+    );
+  } else
+    transaction(s, actorId, a, () => {
+      applyCore(s, actorId, a);
+      finishCombatCosts(s);
+    });
+}
+function finishCombatCosts(s: State) {
+  if (s.penalty || !s.recoil?.length) return;
+  const ids = [...s.recoil];
+  delete s.recoil;
+  for (const cost of ids) {
+    const p = s.players.find((p) => p.id === cost.player)!;
+    damage(s, p, 1, cost.mortal);
+    addLog(
+      s,
+      `${p.name} lost 1 Life from Rocket Launcher's point-blank blast.`,
+    );
+  }
+  if (
+    s.combat &&
+    s.players.some(
+      (p) =>
+        [s.combat!.attacker, s.combat!.defender].includes(p.id) &&
+        (p.dead || p.respawn),
+    )
+  ) {
+    s.combat = null;
+    s.phase = "end";
+  }
+  if (s.pendingVictory) {
+    const winners = s.pendingVictory.filter((id) =>
+      s.players.some((p) => p.id === id && !p.dead && !p.respawn),
+    );
+    delete s.pendingVictory;
+    if (winners.length) win(s, winners);
+  }
+  endCheck(s);
+}
+function applyCore(s: State, actorId: string, a: Action) {
   need(
     s.rulesVersion === 3,
     "This saved prototype uses the old rules. Create a new corrected table.",
@@ -1861,6 +2671,45 @@ export function applyAction(s: State, actorId: string, a: Action) {
     tick(s);
     return;
   }
+  if (s.itemPrompt) {
+    const prompt = s.itemPrompt;
+    need(prompt.player === p.id, "Wait for the card choice.");
+    if (prompt.kind === "movement") {
+      need(a.type === "movement-choice", "Choose one movement die.");
+      const i = integer(a.amount, 0, prompt.values!.length - 1);
+      delete s.itemPrompt;
+      prepareMovement(s, p, prompt.raw![i], prompt.values![i]);
+    } else {
+      need(
+        a.type === "item-teleport",
+        "Choose a teleport target and destination.",
+      );
+      const q = playerById(s, a.target);
+      need(
+        q.id !== p.id && q.region !== 3,
+        "Choose another player outside Shangri-La.",
+      );
+      integer(a.region, 0, 3);
+      integer(a.pos, 0, a.region === 3 ? 0 : COUNTS[a.region!] - 1);
+      delete s.itemPrompt;
+      s.phase = prompt.returnPhase;
+      q.region = a.region!;
+      q.pos = a.pos!;
+      cureOnArrival(s, q);
+      delivery(s, q);
+      addLog(
+        s,
+        `${p.name} teleported ${q.name} to ${spaceName(q.region, q.pos)}.`,
+      );
+      beginRuling(
+        s,
+        p,
+        [],
+        `Milenko's Hat moved ${q.name} to ${spaceName(q.region, q.pos)}. Confirm any off-turn arrival effects with the table before continuing.`,
+      );
+    }
+    return;
+  }
   if (s.endingPending) {
     need(
       s.endingPending === p.id &&
@@ -1895,7 +2744,9 @@ export function applyAction(s: State, actorId: string, a: Action) {
     if (d.kind === "bone-draw") {
       if (a.choice === "skateboard") {
         need(held(p, "Skateboard"), "The Skateboard is no longer available.");
-        const r = nonCombatDie(p, 10);
+        const skate = heldId(p, "Skateboard")!;
+        const r = nonCombatDie(s, p, 10);
+        usedItem(s, p, skate);
         s.lastDice = [r];
         addLog(s, `${p.name} rolled ${r} with Skateboard.`);
         if (r >= 4) return;
@@ -1906,6 +2757,10 @@ export function applyAction(s: State, actorId: string, a: Action) {
       need(q.id !== p.id, "Choose another player.");
       drawBone(s, q);
     }
+    return;
+  }
+  if (a.type === "item-use") {
+    possessionAction(s, p, a);
     return;
   }
   if (a.type === "combat-choice") {
@@ -2139,50 +2994,69 @@ export function applyAction(s: State, actorId: string, a: Action) {
         break;
       }
       {
-        const two = a.choice === "two";
+        if ((p.wagonUntil ?? -1) >= (s.turnsTaken[p.id] ?? 0)) {
+          s.choices = [0, 1, 2, 3].flatMap((region) =>
+            Array.from({ length: COUNTS[region] ?? 1 }, (_, pos) => ({
+              region,
+              pos,
+              toll: 0,
+              reason: "Wagon",
+            })),
+          );
+          s.phase = "move";
+          break;
+        }
+        if (held(p, "Unclear title · card 3300")) {
+          prepareMovement(s, p, 1, 1, false);
+          s.roll = 1;
+          s.choices = destinations(p, 1, s);
+          break;
+        }
+        const truck =
+          a.choice === "truck" ||
+          (a.choice === "two" &&
+            !has(s, p, "two_dice_movement") &&
+            held(p, "Black Truck"));
+        const two = a.choice === "two" || truck,
+          pick = a.choice === "pick";
+        need(!truck || held(p, "Black Truck"), "Black Truck is unavailable.");
         need(
-          !two || has(s, p, "two_dice_movement") || held(p, "Black Truck"),
+          !two || truck || has(s, p, "two_dice_movement"),
           "Two-die movement is unavailable.",
         );
-        const rolls = two ? [dice(), dice()] : [dice()];
-        s.lastDice = rolls;
-        const raw = rolls.reduce((x, y) => x + y, 0);
-        if (raw === 6) {
-          const concussion = boneId(p, "Concussion");
-          if (concussion) removeCard(s, p, concussion);
-        }
-        s.roll = Math.max(1, raw - movementPenalty(p));
-        s.choices = destinations(p, s.roll, s);
-        if (!two && s.roll === 6) {
-          if (has(s, p, "movement_six_teleport"))
-            for (let pos = 0; pos < COUNTS[p.region]; pos++)
-              s.choices.push({
-                region: p.region,
-                pos,
-                toll: 0,
-                reason: "Magic Ninja",
-              });
-          if (has(s, p, "movement_six_visit_player"))
-            for (const q of s.players.filter(
-              (q) => !q.dead && q.id !== p.id && q.region !== 3,
-            ))
-              s.choices.push({
-                region: q.region,
-                pos: q.pos,
-                toll: 0,
-                reason: "Monoxide",
-              });
-        }
-        s.choices = [
-          ...new Map(
-            s.choices.map((d) => [
-              `${d.region}:${d.pos}:${d.itemToll ?? false}`,
-              d,
-            ]),
-          ).values(),
-        ];
-        s.phase = s.choices.length ? "move" : "end";
-        addLog(s, `${p.name} rolled ${rolls.join(" + ")} for movement.`);
+        need(
+          !pick || held(p, ["Stefan", "Moon Glorious", "Choko"][p.region]),
+          "No Homie offers a die choice here.",
+        );
+        const rolls =
+          two || pick
+            ? [
+                playerDie(s, p, 6, false, truck),
+                playerDie(s, p, 6, false, truck),
+              ]
+            : [playerDie(s, p)];
+        s.lastDice = rolls.map((r) => r.raw);
+        if (truck) usedItem(s, p, heldId(p, "Black Truck")!);
+        if (pick) {
+          s.itemPrompt = {
+            player: p.id,
+            kind: "movement",
+            values: rolls.map((r) => r.value),
+            raw: rolls.map((r) => r.raw),
+            returnPhase: "roll",
+          };
+        } else
+          prepareMovement(
+            s,
+            p,
+            rolls.reduce((a, r) => a + r.raw, 0),
+            rolls.reduce((a, r) => a + r.value, 0),
+            !two,
+          );
+        addLog(
+          s,
+          `${p.name} rolled ${rolls.map((r) => r.raw).join(" + ")} for movement.`,
+        );
       }
       break;
     case "move":
@@ -2214,6 +3088,10 @@ export function applyAction(s: State, actorId: string, a: Action) {
       break;
     case "location":
       need(
+        !forcedAttack(s, p),
+        "2 Tuff Tony requires you to attack a player on this space.",
+      );
+      need(
         s.phase === "encounter" && !s.encounter && !s.locationDone,
         "Resolve the pending encounter first.",
       );
@@ -2241,6 +3119,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
       }
       break;
     case "ignore-location": {
+      need(!forcedAttack(s, p), "2 Tuff Tony requires a fight on this space.");
       need(
         s.phase === "encounter" &&
           !s.encounter &&
@@ -2261,6 +3140,10 @@ export function applyAction(s: State, actorId: string, a: Action) {
       break;
     case "attack":
     case "ranged":
+      need(
+        a.type !== "ranged" || !forcedAttack(s, p),
+        "2 Tuff Tony requires a fight on this space.",
+      );
       need(
         s.phase === "encounter" && !s.encounter && !s.locationDone,
         "Choose combat before encountering the space.",
@@ -2402,6 +3285,8 @@ export function applyAction(s: State, actorId: string, a: Action) {
         const n = integer(a.amount ?? 1, 1, p.maxLife - p.life);
         pay(p, held(p, "Health Insurance Card") ? 0 : 100 * n);
         heal(p, n);
+        const insurance = heldId(p, "Health Insurance Card");
+        if (insurance) usedItem(s, p, insurance);
       }
       break;
     case "gamble":
@@ -2415,7 +3300,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
       );
       {
         const n = integer(a.amount, 0, p.cash),
-          r = nonCombatDie(p);
+          r = nonCombatDie(s, p);
         s.lastDice = [r];
         if (r <= 2) p.cash -= n;
         else if (r >= 5) gainCash(p, n);
@@ -2473,7 +3358,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
           p.pos = q.pos;
           combatStart(s, p, [], q, false, true);
         } else {
-          const r = nonCombatDie(p, 10);
+          const r = nonCombatDie(s, p, 10);
           s.lastDice = [r];
           addLog(
             s,
@@ -2518,6 +3403,22 @@ export function applyAction(s: State, actorId: string, a: Action) {
     for (const q of s.players) if (!q.dead) overflow(s, q);
 }
 export function options(s: State, id: string): Option[] {
+  if (s.flow)
+    return s.flow.prompt.player === id
+      ? s.flow.prompt.choices.map((c) => ({
+          label: c.label,
+          action: { type: "card-response", choice: c.id },
+          group: "Card choice",
+        }))
+      : [];
+  if (s.itemPrompt)
+    return s.itemPrompt.player === id && s.itemPrompt.kind === "movement"
+      ? s.itemPrompt.values!.map((v, i) => ({
+          label: `Move using die ${i + 1}: ${v}`,
+          action: { type: "movement-choice", amount: i },
+          group: "Choose movement die",
+        }))
+      : [];
   if (s.status !== "playing") return [];
   const p = s.players.find((p) => p.id === id);
   if (!p) return [];
@@ -2570,6 +3471,7 @@ export function options(s: State, id: string): Option[] {
     return out;
   }
   if (s.phase === "waiting") return out;
+  out.push(...possessionOptions(s, p));
   if (s.overflow?.player === id) {
     for (const item of p.items.filter((id) => !protectedItem(p, id)))
       add(
@@ -2655,14 +3557,37 @@ export function options(s: State, id: string): Option[] {
         : "Roll movement",
       { type: "roll" },
     );
-    if (has(s, p, "two_dice_movement") || held(p, "Black Truck"))
-      add("Move with two dice", { type: "roll", choice: "two" });
+    if (!held(p, "Unclear title · card 3300") && p.region < 3) {
+      if (has(s, p, "two_dice_movement"))
+        add("Move with two dice", { type: "roll", choice: "two" });
+      if (held(p, "Black Truck"))
+        add("Use Black Truck · sum two dice", {
+          type: "roll",
+          choice: "truck",
+        });
+      if (held(p, ["Stefan", "Moon Glorious", "Choko"][p.region]))
+        add("Homie movement · roll two, choose one", {
+          type: "roll",
+          choice: "pick",
+        });
+    }
     for (const item of p.items.filter((id) => card(id).use === "herb"))
       add(
         `Use Herb · heal ${has(s, p, "stronger_herb") ? 2 : 1} Life`,
         { type: "herb", item },
         "Items",
       );
+  }
+  if (s.phase === "encounter" && !s.encounter && forcedAttack(s, p)) {
+    for (const q of s.players.filter(
+      (q) => q.id !== id && !q.dead && !q.respawn && !absent(q) && same(p, q),
+    ))
+      add(
+        `2 Tuff Tony · challenge ${q.name}`,
+        { type: "attack", target: q.id },
+        "Combat",
+      );
+    return out;
   }
   if (s.phase === "encounter") {
     if (s.encounter)
@@ -2879,9 +3804,12 @@ export function publicState(s: State, session: string) {
     ending,
     players,
     peek,
+    flow,
     ...rest
   } = s;
   const needed = [
+    s.flow?.prompt.player,
+    s.itemPrompt?.player,
     s.endingPending,
     s.decision?.actor,
     s.overflow?.player,
@@ -2908,6 +3836,7 @@ export function publicState(s: State, session: string) {
       capacity: capacity(p as Player),
       conditionDetails: conditionSummary(s, p as Player),
     })),
+    pendingCard: flow?.prompt ?? null,
     serverTime: Date.now(),
     peek:
       peek &&
@@ -2948,6 +3877,8 @@ export function runBots(s: State) {
   for (let i = 0; i < 30 && s.status === "playing"; i++) {
     const p = current(s);
     if (
+      s.flow ||
+      s.itemPrompt ||
       !p.bot ||
       controllerFor(s, p) !== p.id ||
       s.endingPending ||
