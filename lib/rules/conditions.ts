@@ -30,12 +30,13 @@ export function controllerFor(s: State, p: Player) {
     const cond = Object.entries(p.conditions ?? {}).find(
       ([id]) => cardName(id) === "Skitsofrantic",
     )?.[1];
-    if (cond?.controller && s.players.some((q) => q.id === cond.controller))
+    if (cond?.controller && s.players.some((q) => q.id === cond.controller && !q.left && !q.dead))
       return cond.controller;
   }
   return p.id;
 }
 export function canControl(s: State, actorId: string, p: Player) {
+  if (p.left || !s.players.some(q => q.id === actorId && !q.left)) return false;
   const owner = controllerFor(s, p);
   const controller = s.players.find((q) => q.id === owner);
   return actorId === owner || (actorId === s.host && controller?.bot === true);

@@ -246,8 +246,8 @@ test("board rules use real healing prices and skip-turn effects", () => {
 test("automatic fiend reward uses the printed Combat Bonus", () => {
   const s = game(),
     p = s.players[0];
-  const id = s.decks[2].find(
-    (id) => card(id).kind === "fiend" && card(id).automatic,
+  const id = s.decks[0].find(
+    (id) => card(id).name === "Drainer Road Monk",
   );
   const c = card(id);
   s.phase = "encounter";
@@ -260,7 +260,7 @@ test("automatic fiend reward uses the printed Combat Bonus", () => {
     applyAction(s, p.id, { type: "combat-choice", weapon: null }),
   );
   assert.equal(p.bonus, old + c.reward);
-  assert.ok(s.discards[2].includes(id));
+  assert.ok(s.discards[0].includes(id));
 });
 test("PvP waits for both combat choices and winner chooses cash penalty", () => {
   const s = game(),
@@ -350,7 +350,7 @@ test("consented trades transfer only Items and Cash", () => {
 test("unautomated card effects require a visible ruling, not invented automatic results", () => {
   const s = game(),
     p = s.players[0];
-  const id = s.decks[0].find((id) => card(id).kind === "event");
+  const id = s.decks[0].find((id) => card(id).kind === "event" && !card(id).automatic);
   s.board["0:0"] = [id];
   s.encounter = id;
   s.phase = "encounter";

@@ -1,4 +1,4 @@
-import { makeRoom, dice, CHARACTERS, publicState } from "@/lib/game";
+import { makeRoom, dice, CHARACTERS, publicState, applyAction, runBots } from "@/lib/game";
 import {
   createRoom,
   session,
@@ -22,6 +22,7 @@ export async function POST(req: Request) {
         () => alphabet[dice(alphabet.length) - 1],
       ).join("");
       const s = makeRoom(code, sid, name, character);
+      if(b.practice===true){applyAction(s,s.host,{type:'start-practice'});runBots(s);}
       if (await createRoom(s, sid)) return result(publicState(s, sid), 201);
     }
     throw new Error("Could not open a table. Please try again.");

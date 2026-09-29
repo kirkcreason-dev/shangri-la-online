@@ -3,6 +3,7 @@ import board from "../board.json" with { type: "json" };
 import cards from "./cards.json" with { type: "json" };
 import spaces from "./spaces.json" with { type: "json" };
 import type { Card, Player, State } from "./types.ts";
+import { AUTOMATIC_ENCOUNTERS, AUTOMATIC_FIENDS } from './automation.ts';
 export const CHARACTER_REPLACEMENTS: Record<string, string> = {
   Blaze: "Digital Duke",
   "Jamie Madrox": "Nocturnal Deadhead",
@@ -24,7 +25,7 @@ export const COLORS = [
 ];
 export const COUNTS = [28, 20, 12];
 export const GATES = [11, 18, 6];
-export const CARDS = cards as Card[];
+export const CARDS = (cards as Card[]).map(c => ({...c, automatic: c.automatic || AUTOMATIC_ENCOUNTERS.has(c.name) || AUTOMATIC_FIENDS.has(c.name) || ['Milenko\'s Hat','Unclear title · card 3300'].includes(c.name)}));
 export const CARD_BY_KEY: Record<string, Card> = Object.fromEntries(
   CARDS.map((c) => [c.key, c]),
 );

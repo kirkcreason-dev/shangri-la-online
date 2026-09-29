@@ -1,7 +1,7 @@
 import type { Option } from "./rules/types.ts";
 type GuideRoom = {
   status: string; phase: string; legacy?: boolean; endedByHost?: string; me: string | null; control: string | null; turn: number;
-  players: {id: string; name: string; ready?: boolean; controller?: string; bot?: boolean}[];
+  players: {id: string; name: string; ready?: boolean; left?: boolean; controller?: string; bot?: boolean}[];
   pendingCard?: {player: string} | null; itemPrompt?: {player: string} | null;
   endingPending?: string | null; decision?: {actor: string} | null; overflow?: {player: string} | null; ruling?: {actor: string} | null; penalty?: {winner: string} | null;
   combat?: {attacker: string; defender?: string | null; choices: Record<string, unknown>} | null;
@@ -18,7 +18,7 @@ export function tableGuidance(room: GuideRoom) {
     const ready = room.players.filter(p => p.ready).length;
     return result("Gather your table", `${ready}/${room.players.length} ready · ${room.players.length < 2 ? "Invite a friend or add a practice opponent." : "Everyone must be ready before the host starts."}`);
   }
-  if (!own) return result("Watching the table", `${active?.name ?? "A player"} is taking their turn.`);
+  if (!own || own.left) return result("Watching the table", `${active?.name ?? "A player"} is taking their turn.`);
   const response = room.pendingCard?.player ?? room.itemPrompt?.player ?? room.endingPending;
   if (response) {
     const player = room.players.find(p => p.id === response);
@@ -40,8 +40,8 @@ export function tableGuidance(room: GuideRoom) {
   }
   if (controlled?.id !== active?.id) return result(`Waiting for ${active?.name ?? "the active player"}`, "You can inspect the board, check your cards, or chat.");
   const prompt = room.decision || room.overflow || room.ruling;
-  const quick = !prompt && ["roll", "end"].includes(room.phase)
-    ? room.options.find(o => o.action.type === room.phase && !o.action.choice) : undefined;
+  const quick = !prompt && ["roll", "end", "encounter"].includes(room.phase)
+    ? room.options.find(o => (o.action.type === room.phase || room.phase === "encounter" && ["resolve","location"].includes(o.action.type)) && !o.action.choice) : undefined;
   const hints: Record<string, [string, string]> = {
     roll: ["Ready to roll", "Use any start-of-turn powers, then roll for movement."],
     move: ["Choose your destination", "Tap a glowing space to preview its rules and toll, then press Move to confirm."],

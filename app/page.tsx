@@ -10,6 +10,9 @@ import {
   cardName,
   character as characterRecord,
 } from "@/lib/rules/catalog";
+import { ChoiceCard, CardSelect } from '@/components/game/ChoiceCards';
+import { TableActivity } from '@/components/game/TableActivity';
+import { StartGame, GameLobby } from '@/components/game/StartGame';
 import { LearnToPlay } from "@/components/game/LearnToPlay";
 import { TableGuide, jumpToTableSection } from "@/components/game/TableGuide";
 import { tableGuidance } from "@/lib/table-guide";
@@ -165,7 +168,7 @@ function CombatForm({
       </p>
       <label>
         Weapon
-        <select value={weapon} onChange={(e) => setWeapon(e.target.value)}>
+        <CardSelect aria-label="Weapon" value={weapon} onChange={(e) => setWeapon(e.target.value)}>
           <option value="">No Weapon</option>
           {p.items
             .filter(
@@ -174,18 +177,18 @@ function CombatForm({
                   ["Officer Harry Cox", "Slippery Palms"].includes(cardName(x)),
                 ) &&
                 card(id).weapon &&
-                (!f.ranged || p.id !== f.attacker || card(id).ranged),
+                (!f.ranged || p.id !== f.attacker || card(id).ranged) && !f.cards.some(id=>cardName(id)==='R. O. C.'),
             )
             .map((id) => (
               <option key={id} value={id}>
                 {cardName(id)} (+{card(id).combat})
               </option>
             ))}
-        </select>
+        </CardSelect>
       </label>
       <label>
         Consume a 2-liter for +2
-        <select value={drink} onChange={(e) => setDrink(e.target.value)}>
+        <CardSelect aria-label="Consume a 2-liter for +2" value={drink} onChange={(e) => setDrink(e.target.value)}>
           <option value="">Save my drinks</option>
           {p.items
             .filter((id) => card(id).use === "drink")
@@ -194,11 +197,11 @@ function CombatForm({
                 {cardName(id)}
               </option>
             ))}
-        </select>
+        </CardSelect>
       </label>
       <label>
         Protect against Life loss
-        <select value={defense} onChange={(e) => setDefense(e.target.value)}>
+        <CardSelect aria-label="Protect against Life loss" value={defense} onChange={(e) => setDefense(e.target.value)}>
           <option value="">No armor</option>
           {p.items
             .filter((id) => card(id).use === "armor")
@@ -207,7 +210,7 @@ function CombatForm({
                 {cardName(id)}
               </option>
             ))}
-        </select>
+        </CardSelect>
       </label>
       {has("fiend_finishing_move") && !f.defender && (
         <label className="check">
@@ -303,17 +306,17 @@ function TeleportForm({
       <h3>Milenko’s Hat · choose a destination</h3>
       <label>
         Player
-        <select value={target} onChange={(e) => setTarget(e.target.value)}>
+        <CardSelect aria-label="Player" value={target} onChange={(e) => setTarget(e.target.value)}>
           {eligible.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-        </select>
+        </CardSelect>
       </label>
       <label>
         Region
-        <select
+        <CardSelect aria-label="Region"
           value={region}
           onChange={(e) => {
             setRegion(Number(e.target.value));
@@ -325,11 +328,11 @@ function TeleportForm({
               {name}
             </option>
           ))}
-        </select>
+        </CardSelect>
       </label>
       <label>
         Space
-        <select value={pos} onChange={(e) => setPos(Number(e.target.value))}>
+        <CardSelect aria-label="Space" value={pos} onChange={(e) => setPos(Number(e.target.value))}>
           {Array.from(
             { length: region === 3 ? 1 : [28, 20, 12][region] },
             (_, i) => (
@@ -338,7 +341,7 @@ function TeleportForm({
               </option>
             ),
           )}
-        </select>
+        </CardSelect>
       </label>
       <button className="primary" disabled={busy || !target}>
         Teleport player
@@ -399,7 +402,7 @@ function TableControls({
       >
         <label>
           Player
-          <select
+          <CardSelect aria-label="Player"
             value={target}
             onChange={(e) => {
               setTarget(e.target.value);
@@ -413,11 +416,11 @@ function TableControls({
                   {p.name}
                 </option>
               ))}
-          </select>
+          </CardSelect>
         </label>
         <label>
           Apply effect
-          <select
+          <CardSelect aria-label="Apply effect"
             value={stat}
             onChange={(e) => {
               setStat(e.target.value);
@@ -445,7 +448,7 @@ function TableControls({
                 {label}
               </option>
             ))}
-          </select>
+          </CardSelect>
         </label>
         {["life", "cash", "bonus", "boost", "skip", "extra"].includes(stat) && (
           <label>
@@ -483,7 +486,7 @@ function TableControls({
         {["discard", "transfer", "retrieve"].includes(stat) && (
           <label>
             Card
-            <select
+            <CardSelect aria-label="Card"
               required
               value={item}
               onChange={(e) => setItem(e.target.value)}
@@ -497,13 +500,13 @@ function TableControls({
                   {cardName(id)}
                 </option>
               ))}
-            </select>
+            </CardSelect>
           </label>
         )}
         {stat === "transfer" && (
           <label>
             Give to
-            <select
+            <CardSelect aria-label="Give to"
               value={recipient}
               required
               onChange={(e) => setRecipient(e.target.value)}
@@ -516,14 +519,14 @@ function TableControls({
                     {p.name}
                   </option>
                 ))}
-            </select>
+            </CardSelect>
           </label>
         )}
         {stat === "move" && (
           <>
             <label>
               Region
-              <select
+              <CardSelect aria-label="Region"
                 value={region}
                 onChange={(e) => {
                   setRegion(Number(e.target.value));
@@ -535,11 +538,11 @@ function TableControls({
                     {r}
                   </option>
                 ))}
-              </select>
+              </CardSelect>
             </label>
             <label>
               Space
-              <select
+              <CardSelect aria-label="Space"
                 value={pos}
                 onChange={(e) => setPos(Number(e.target.value))}
               >
@@ -548,21 +551,21 @@ function TableControls({
                     {spaceName(region, i)} · {i + 1}
                   </option>
                 ))}
-              </select>
+              </CardSelect>
             </label>
           </>
         )}
         {stat === "draw" && (
           <label>
             Deck
-            <select value={deck} onChange={(e) => setDeck(e.target.value)}>
+            <CardSelect aria-label="Deck" value={deck} onChange={(e) => setDeck(e.target.value)}>
               {REGIONS.map((r, i) => (
                 <option key={r} value={i}>
                   {r}
                 </option>
               ))}
               <option value="bone">Bones</option>
-            </select>
+            </CardSelect>
           </label>
         )}
         <label>
@@ -621,7 +624,7 @@ function TradeForm({
       >
         <label>
           Trade with
-          <select
+          <CardSelect aria-label="Trade with"
             value={target}
             required
             onChange={(e) => {
@@ -635,18 +638,18 @@ function TradeForm({
                 {q.name}
               </option>
             ))}
-          </select>
+          </CardSelect>
         </label>
         <label>
           Give Item
-          <select value={give} onChange={(e) => setGive(e.target.value)}>
+          <CardSelect aria-label="Give Item" value={give} onChange={(e) => setGive(e.target.value)}>
             <option value="">No Item</option>
             {p.items.map((id) => (
               <option key={id} value={id}>
                 {cardName(id)}
               </option>
             ))}
-          </select>
+          </CardSelect>
         </label>
         <label>
           Give Cash
@@ -660,14 +663,14 @@ function TradeForm({
         </label>
         <label>
           Request Item
-          <select value={ask} onChange={(e) => setAsk(e.target.value)}>
+          <CardSelect aria-label="Request Item" value={ask} onChange={(e) => setAsk(e.target.value)}>
             <option value="">No Item</option>
             {q?.items.map((id) => (
               <option key={id} value={id}>
                 {cardName(id)}
               </option>
             ))}
-          </select>
+          </CardSelect>
         </label>
         <label>
           Request Cash
@@ -691,6 +694,8 @@ export default function Home() {
   const quitDialog = useRef<HTMLDialogElement>(null);
   const endDialog = useRef<HTMLDialogElement>(null);
   const [endError, setEndError] = useState("");
+  const [leaveError,setLeaveError]=useState("");
+  const [rolling,setRolling]=useState(false);
   useEffect(() => {
     try { setLearned(localStorage.getItem("qsl_tutorial_complete") === "1"); } catch { /* Optional preference. */ }
     if (new URLSearchParams(window.location.search).get("tutorial") === "1") setLearning(true);
@@ -752,6 +757,7 @@ export default function Home() {
     if (!room?.me) return;
     const seat = room.players.find(p => p.id === room.me);
     if (!seat) return;
+    if(seat.left){setRecent(old=>old.filter(t=>t.code!==room.code));return;}
     if (CHARACTERS.includes(seat.character)) setCharacter(seat.character);
     setRecent(old => rememberTable(old, {code: room.code, character: seat.character, playerName: seat.name, status: room.status, round: room.round, players: room.players.length, lastSeen: Date.now()}));
   }, [room?.code, room?.rev, room?.me]);
@@ -793,7 +799,7 @@ export default function Home() {
     setRoom(null); setError(""); setConnection(""); setToast(""); setInviteFallback("");
     remember(c); setRefreshKey(k => k + 1);
   }
-  async function enter(join: boolean) {
+  async function enter(join: boolean, practice=false) {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -804,7 +810,7 @@ export default function Home() {
         throw new Error("Enter a six-character room code or paste an invite link.");
       const next = await api(
         join ? "/api/rooms/" + parsedCode : "/api/rooms",
-        { name, character },
+        { name: name.trim() || "Player", character, practice },
       );
       update(next);
       remember(next.code);
@@ -821,6 +827,7 @@ export default function Home() {
       if (!r || busyRef.current) return;
       busyRef.current = true;
       setBusy(true);
+      setRolling(['roll','combat-choice','ruling-die'].includes(a.type));
       setError("");
       try {
         const next = await api(`/api/rooms/${r.code}/action`, {
@@ -838,7 +845,7 @@ export default function Home() {
         throw e;
       } finally {
         busyRef.current = false;
-        setBusy(false);
+        setBusy(false);setRolling(false);
       }
     },
     [update],
@@ -965,7 +972,7 @@ export default function Home() {
         <span className="edition">OFFICIAL BETA</span>
         <div className="row">
           {room && (
-            <button className="quiet quit-game-trigger" onClick={() => quitDialog.current?.showModal()} disabled={busy}>
+            <button className="quiet quit-game-trigger" onClick={() => {setLeaveError('');quitDialog.current?.showModal();}} disabled={busy}>
               Quit game
             </button>
           )}
@@ -976,7 +983,9 @@ export default function Home() {
           </button>
         </div>
       </header>
-      <div className={"game-layout " + (room ? "playing" : "")}>
+      {!room&&!code&&<StartGame name={name} setName={setName} character={character} setCharacter={setCharacter} code={joinCode} setCode={setJoinCode} busy={busy} offline={offline} onStart={(join,practice)=>void enter(join,practice)} onLearn={()=>setLearning(true)} error={error}/>}
+      {room?.status==='lobby'&&me&&<GameLobby code={room.code} players={room.players} me={me.id} host={room.host} busy={busy} offline={offline} onReady={()=>action({type:'ready'})} onStart={()=>action({type:'start'})} onPractice={()=>action({type:'start-practice'})} onInvite={copy}/>}
+      <div className={"game-layout " + (room ? "playing" : "home-preview") + (room&&!me?' needs-seat':'')}>
         <section className="table" id="table-board" tabIndex={-1}>
           <div className="table-heading">
             <div>
@@ -1012,6 +1021,8 @@ export default function Home() {
             </div>
           )}
           {room && guide && room.status === "playing" && !room.legacy && <TableGuide guide={guide} phase={room.phase} stats={me} busy={busy} offline={offline} onAction={action} connection={offline ? "OFFLINE" : connection ? "RECONNECTING" : "LIVE TABLE · SAVED AUTOMATICALLY"} />}
+          {room?.status==='playing'&&<TableActivity roomCode={room.code} moments={room.activity} rolling={rolling}/>}
+          {me?.left&&<div className="game-ended-banner"><strong>You left this match.</strong><p>You can watch the remaining players, or start a new game.</p><button className="primary" onClick={closeView}>Back to play menu</button></div>}
           {room?.status === "finished" && room.endedByHost && <section className="game-ended-banner" role="status"><strong>The host ended this game.</strong><p>No winner was declared. The final board and history are saved; no further turns can be played.</p><button className="quiet" onClick={closeView}>Back to the main menu</button></section>}
           {!learned && <section className="learn-invitation"><div><span>NEW TO THE QUEST?</span><strong>Learn by playing one short turn.</strong><p>Try moving, drawing a card, and winning a fight. Your real table stays untouched.</p></div><button className="primary" onClick={() => setLearning(true)}>Try the tutorial →</button></section>}
           {room?.legacy && (
@@ -1085,7 +1096,7 @@ export default function Home() {
                         </strong>
                         <span className="stats">{q.character}</span>
                         <span className="stats">
-                          {q.dead
+                          {q.left ? "Left the match" : q.dead
                             ? "Eliminated"
                             : `♥ ${q.life}/${q.maxLife} · CB ${q.bonus} · $${q.cash}`}
                         </span>
@@ -1152,10 +1163,10 @@ export default function Home() {
               {error}
             </div>
           )}
-          {(!room || (!me && !room.legacy)) && (
+          {room && !me && !room.legacy && (
             <section className="panel join-panel">
               <span className="eyebrow">TAKE A SEAT</span>
-              <h2>{room ? "Join this table." : "Choose your character."}</h2>
+              <h2>Join this table.</h2>
               <form
                 className="stack"
                 onSubmit={(e) => {
@@ -1171,12 +1182,12 @@ export default function Home() {
                     placeholder="What should we call you?"
                     maxLength={24}
                     autoComplete="nickname"
-                    required
                   />
                 </label>
-                <label>
+                <button className="primary" disabled={busy||offline||room.status!=='lobby'}>{busy?'Joining…':'Join this game →'}</button>
+                <details><summary>Optional · change character ({character})</summary>                <label>
                   Character
-                  <select
+                  <CardSelect aria-label="Character"
                     value={character}
                     onChange={(e) => setCharacter(e.target.value)}
                   >
@@ -1188,8 +1199,9 @@ export default function Home() {
                         {c}
                       </option>
                     ))}
-                  </select>
+                  </CardSelect>
                 </label>
+</details>
                 <div className="character-record">
                   <strong>{roster.name}</strong>
                   <p>
@@ -1216,52 +1228,8 @@ export default function Home() {
                   and basic combat are automated; special cards and powers use
                   logged table controls.
                 </p>
-                <button
-                  className="primary"
-                  disabled={
-                    busy || offline || (!!code && !room) ||
-                    room?.status === "playing" ||
-                    room?.status === "finished"
-                  }
-                >
-                  {busy
-                    ? "Opening table…"
-                    : room
-                      ? "Join table"
-                      : "Create a table"}
-                </button>
+
               </form>
-              {!room && (
-                <>
-                  <div className="divider">OR JOIN A TABLE</div>
-                  <form
-                    className="stack"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void enter(true);
-                    }}
-                  >
-                    <label>
-                      Room code or invite link
-                      <input
-                        value={joinCode}
-                        onChange={(e) => setJoinCode(e.target.value)}
-                        maxLength={2048}
-                        autoCapitalize="characters"
-                        spellCheck={false}
-                        required
-                        placeholder="ABC234 or paste an invite link"
-                      />
-                    </label>
-                    <button
-                      className="secondary"
-                      disabled={busy || offline || (!!code && !room) || !name.trim()}
-                    >
-                      Join table
-                    </button>
-                  </form>
-                </>
-              )}
             </section>
           )}
           {room && me && !room.legacy && (
@@ -1283,72 +1251,13 @@ export default function Home() {
               {inviteFallback && <label className="invite-fallback">Invite link<input readOnly value={inviteFallback} onFocus={e => e.currentTarget.select()} /></label>}
               {room.status === "lobby" ? (
                 <>
-                  <h2>Gather at the table.</h2>
-                  <p>
-                    The highest d10 roll takes the first turn. A hidden ending
-                    waits in Shangri-La.
-                  </p>
-                  <label>
-                    Your character
-                    <select
-                      value={me.character}
-                      disabled={busy || offline}
-                      onChange={(e) =>
-                        action({ type: "character", character: e.target.value })
-                      }
-                    >
-                      {CHARACTERS.map((c) => (
-                        <option
-                          key={c}
-                          disabled={room.players.some(
-                            (p) => p.character === c && p.id !== me.id,
-                          )}
-                        >
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="actions">
-                    <button
-                      className="secondary"
-                      disabled={busy || offline}
-                      onClick={() => action({ type: "ready" })}
-                    >
-                      {me.ready ? "Ready · click to unready" : "I’m ready"}
-                    </button>
-                    {host && (
-                      <>
-                        <button
-                          className="primary"
-                          disabled={
-                            busy || offline ||
-                            room.players.length < 2 ||
-                            room.players.some((p) => !p.ready)
-                          }
-                          onClick={() => action({ type: "start" })}
-                        >
-                          Start the quest
-                        </button>
-                        <button
-                          className="quiet"
-                          disabled={busy || offline || room.players.length >= 6}
-                          onClick={() => action({ type: "add-bot" })}
-                        >
-                          Add practice opponent
-                        </button>
-                        <p className="small">
-                          You make the practice opponent’s special-card and
-                          combat choices.
-                        </p>
-                      </>
-                    )}
-                  </div>
+                  <details className="lobby-character"><summary>Change your character · {me.character}</summary><CardSelect aria-label="Your character" value={me.character} disabled={busy||offline} onChange={e=>action({type:'character',character:e.target.value})}>{CHARACTERS.map(c=><option key={c} disabled={room.players.some(p=>p.id!==me.id&&p.character===c)}>{c}</option>)}</CardSelect></details>
+                  <p className="small">Use the lobby at the top to get ready and start the game.</p>
                 </>
               ) : room.status === "finished" ? (
                 <>
                   <h2>
-                    {room.endedByHost ? "Game ended by the host" : room.winners
+                    {room.endedByHost ? "Game ended by the host" : room.endedBecause==='abandoned'?'Table closed':room.winners
                       .map((id) => room.players.find((p) => p.id === id)?.name)
                       .join(" & ") || "No survivors"}
                   </h2>
@@ -1432,7 +1341,7 @@ export default function Home() {
                     p?.id === room.itemPrompt.player && (
                       <TeleportForm room={room} act={action} busy={busy || offline} />
                     )}
-                  {room.encounter && <CardView id={room.encounter} />}{" "}
+                  {room.encounter && <div className="encounter-reveal" key={room.encounter}><CardView id={room.encounter} /></div>}{" "}
                   {myTurn &&
                     room.phase === "move" &&
                     !room.pendingCard &&
@@ -1481,22 +1390,7 @@ export default function Home() {
                   {groups.map((group) => (
                     <div className="option-group" key={group}>
                       <h3>{group}</h3>
-                      <div className="actions">
-                        {room.options
-                          .filter((o) => o.group === group)
-                          .map((o, i) => (
-                            <button
-                              className={
-                                group === "Turn" ? "primary" : "secondary"
-                              }
-                              disabled={busy || offline}
-                              key={i}
-                              onClick={() => action(o.action)}
-                            >
-                              {o.label}
-                            </button>
-                          ))}
-                      </div>
+                      <div className="choice-grid">{room.options.filter(o=>o.group===group).map((o,i)=><ChoiceCard key={JSON.stringify(o.action)+i} option={o} disabled={busy||offline} onChoose={()=>action(o.action)}/>)}</div>
                     </div>
                   ))}
                   {myTurn &&
@@ -1698,8 +1592,8 @@ export default function Home() {
             <span className="eyebrow">ABOUT THIS EDITION</span>
             <p className="small">
               Reconstructed from the scanned rulebook and community component
-              photographs. Rules are paraphrased. Special effects and their
-              timing still need manual resolution. The rulebook lists 110
+              photographs. Rules are paraphrased. Common card effects resolve automatically. Cards marked “manual”
+              still need a table ruling. The rulebook lists 110
               Detroit and 70 Dark Carnival cards; this recovered set contains
               101 and 69, with unresolved duplicates. This official beta is
               still being checked against the complete physical game.
@@ -1729,13 +1623,14 @@ export default function Home() {
           <div className="quit-actions"><button autoFocus className="quiet" disabled={busy} onClick={() => endDialog.current?.close()}>Keep playing</button><button className="danger-button" disabled={busy || offline || room?.status === "finished"} onClick={async () => {setEndError("");try {await act({type:"end-game",actor:me?.id});endDialog.current?.close();} catch(e) {setEndError((e as Error).message);}}}>{busy?"Ending game…":"End game for everyone"}</button></div>
         </div>
       </dialog>
-      <dialog ref={quitDialog} className="quit-dialog" aria-labelledby="quit-title">
+      <dialog ref={quitDialog} className="quit-dialog" aria-labelledby="quit-title" onCancel={e=>{if(busy)e.preventDefault();}}>
         <div className="modal">
           <span className="eyebrow">LEAVE THE TABLE SCREEN</span>
-          <h2 id="quit-title">Quit to the main menu?</h2>
-          <p>Your seat and progress in room <strong>{room?.code}</strong> stay saved. Find it under <strong>Return to a table</strong> whenever you want to come back.</p>
-          <p className="quit-note">This does not end the match or skip your turn. Your table may still need your choices.</p>
-          <div className="quit-actions"><button autoFocus className="quiet" onClick={() => quitDialog.current?.close()}>Keep playing</button><button className="primary" disabled={busy} onClick={() => {quitDialog.current?.close();closeView();}}>Quit game</button></div>
+          <h2 id="quit-title">How would you like to leave?</h2>
+          <p><b>Save my seat</b> returns to the menu. Your progress stays saved, and the table may still need your turn.</p>
+          {room?.status!=='finished'&&!me?.left&&<p><b>Leave permanently</b> forfeits your seat and passes play to the remaining players. If you’re the host, another player takes over. You cannot rejoin this match.</p>}
+          {leaveError&&<p className="error" role="alert">{leaveError}</p>}
+          <div className="exit-choices"><button className="secondary" disabled={busy} onClick={()=>{quitDialog.current?.close();closeView();}}>Save my seat · go to menu</button>{room?.status!=='finished'&&me&&!me.left&&<button className="danger-button" disabled={busy||offline} onClick={async()=>{setLeaveError('');try{await act({type:'leave-game',actor:me.id});setRecent(old=>old.filter(t=>t.code!==room!.code));quitDialog.current?.close();closeView();}catch(e){setLeaveError((e as Error).message);}}}>{busy?'Leaving…':'Leave permanently'}</button>}<button autoFocus className="quiet" disabled={busy} onClick={()=>quitDialog.current?.close()}>Keep playing</button></div>
         </div>
       </dialog>
       <dialog ref={rules} className="rules-dialog">

@@ -18,7 +18,7 @@ export function TableGuide({guide, busy, offline, phase, stats, onAction, connec
     </div>
     <p>{guide.detail}</p>
     <div className="guide-bottom"><ol className="turn-progress" aria-label="Turn progress">{["Roll", "Move", "Encounter", "End"].map((label, i) => <li key={label} className={i === step ? "current" : i < step ? "done" : ""} aria-current={i === step ? "step" : undefined}><span>{i < step ? "✓" : i + 1}</span>{label}</li>)}</ol>
-      <div className="guide-buttons">{guide.quick && <button className="primary" disabled={busy || offline} onClick={() => onAction(guide.quick!.action)}>{guide.quick.label}</button>}<button className="quiet" onClick={() => jumpToTableSection("table-controls")}>Controls ↓</button></div>
+      <div className="guide-buttons">{guide.quick && <button className="primary" disabled={busy || offline} onClick={() => onAction(guide.quick!.action)}>{guide.quick.label}</button>}<button className="quiet" onClick={() => jumpToTableSection(phase === "move" ? "available-destinations" : "table-controls")}>{phase === "move" ? "Choose where to move ↓" : "Show my choices ↓"}</button></div>
     </div>
   </section>;
 }

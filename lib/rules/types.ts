@@ -62,6 +62,7 @@ export type Player = {
   allegiance: Allegiance;
   ready: boolean;
   dead: boolean;
+  left?: boolean;
   rebirth: boolean;
   bot?: boolean;
   notes: string;
@@ -197,6 +198,10 @@ export type State = {
   winner: string | null;
   winners: string[];
   endedByHost?: string;
+  endedBecause?: "abandoned";
+  activity?: TableMoment[];
+  activitySeq?: number;
+  lastCombat?: { sequence?: number; actor: string; opponent: string; dice: number[]; total: number; opposingTotal: number; result: "win" | "loss" | "tie" };
   rev: number;
   combat: Combat | null;
   penalty: Penalty | null;
@@ -240,3 +245,14 @@ export type Action = {
   modifier?: number;
 };
 export type Option = { label: string; action: Action; group?: string };
+export type TableMoment = {
+  id: number;
+  kind: "roll" | "move" | "card" | "combat" | "reward" | "departure";
+  title: string;
+  detail: string;
+  dice?: number[];
+  card?: string;
+  player?: string;
+  result?: "win" | "loss" | "tie";
+  changes?: { label: string; amount: number }[];
+};

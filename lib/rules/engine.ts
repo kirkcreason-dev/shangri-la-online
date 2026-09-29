@@ -1,3 +1,6 @@
+import { AUTOMATIC_ENCOUNTERS, AUTOMATIC_FIENDS } from './automation.ts';
+import { encounterEffect, uniqueCards, fiendLoss, discardChoice, type CardRuntime } from './card-effects.ts';
+import { addMoment, recordActivity } from './activity.ts';
 import { ask, randomValue, transaction } from "./reactions.ts";
 import {
   absent,
@@ -889,60 +892,48 @@ function combatStart(
   };
   s.phase = "combat";
   s.trade = null;
+  if(ids.some(id=>cardName(id)==='Suburban Gangsta')&&p.homies.length){
+    addLog(s,`${p.name}'s Homies automatically defeated Suburban Gangsta.`);
+    s.lastCombat={sequence:(s.lastCombat?.sequence??0)+1,actor:p.id,opponent:'Suburban Gangsta',dice:[],total:0,opposingTotal:0,result:'win'};
+    cardCombatEnd(s,p,'win');return;
+  }
+  if(ids.some(id=>cardName(id)==='Florida Joe')&&p.cash>=100&&ask({player:p.id,message:'Florida Joe offers a way out of this fight.',choices:[{id:'pay',label:'Pay $100 · tie the fight'},{id:'fight',label:'Fight Florida Joe'}]})==='pay'){
+    pay(p,100);cardCombatEnd(s,p,'tie');addLog(s,`${p.name} paid Florida Joe $100 to end combat in a tie.`);return;
+  }
   addLog(
     s,
     `${p.name} challenges ${defender?.name ?? (ids.length ? ids.map(cardName).join(" + ") : ENDINGS.find((e) => e.id === s.ending)?.name)}${ranged ? " at range" : ""}${mortal ? " in Mortal Combat" : ""}.`,
   );
 }
-function cardCombatEnd(
-  s: State,
-  p: Player,
-  result: "win" | "loss" | "tie",
-  finisher = false,
-) {
-  const fight = s.combat!;
-  const cards = fight.cards;
-  let needsRuling = false;
-  if (result === "win") {
-    for (const id of cards) {
-      cb(p, card(id).reward ?? 0);
-      if (!card(id).automatic) needsRuling = true;
-      removeBoard(s, [id]);
-      discard(s, id);
-    }
-    s.wonFiend = true;
-  } else if (result === "loss") {
-    if (!fight.ranged)
-      combatDamage(
-        s,
-        p,
-        finisher ||
-          spaceRule(p.region, p.pos)?.effects.some(
-            (e: any) => e.type === "combat_loss_life_replacement",
-          )
-          ? 2
-          : 1,
-        false,
-        fight.choices[p.id]?.defense,
-      );
-    needsRuling = cards.some((id) => !card(id).automatic);
+function cardCombatEnd(s: State, p: Player, result: "win"|"loss"|"tie", finisher=false) {
+  const fight=s.combat!, cards=fight.cards, fx=cardRuntime(s);
+  let needsRuling=false;
+  const weapon=fight.choices[p.id]?.weapon;
+  if(weapon && p.items.includes(weapon) && !card(weapon).ranged && cards.some(id=>cardName(id)==='The Burning Man')) {
+    removeCard(s,p,weapon);addLog(s,`${p.name}'s ${cardName(weapon)} burned away.`);
   }
-  if (fight.redirectedBy && result !== "win")
-    for (const id of cards) {
-      removeBoard(s, [id]);
-      discard(s, id);
+  if(result==='win'){
+    for(const id of cards){cb(p,card(id).reward??0);if(!card(id).automatic)needsRuling=true;removeBoard(s,[id]);discard(s,id);}
+    s.wonFiend=true;
+  }else if(result==='loss'){
+    let avoid=cards.some(id=>cardName(id)==='2-Dog');
+    if(cards.some(id=>cardName(id)==='Vamp')&&p.homies.length){
+      avoid=ask({player:p.id,message:'Vamp can take a Homie instead of 1 Life.',choices:[{id:'homie',label:'Discard a Homie · prevent Life loss'},{id:'life',label:'Accept the Life loss'}]})==='homie';
+      if(avoid)discardChoice(s,p,fx,'homies');
     }
-  s.combat = null;
-  s.encounter = null;
-  s.queue = [];
-  s.phase = "end";
-  if (needsRuling && !p.dead && !p.respawn)
-    ruling(
-      s,
-      p,
-      cards,
-      `Combat result: ${result}. Apply only the card's additional effect for that result.`,
-    );
+    if(!fight.ranged&&!avoid)combatDamage(s,p,finisher||spaceRule(p.region,p.pos)?.effects.some((e:any)=>e.type==='combat_loss_life_replacement')||cards.some(id=>cardName(id)==="Big Baby Sweets' Mom"&&p.character==='Big Baby Sweets')?2:1,false,fight.choices[p.id]?.defense);
+    needsRuling=cards.some(id=>!card(id).automatic);
+  }
+  if(fight.redirectedBy&&result!=='win')for(const id of cards){removeBoard(s,[id]);discard(s,id);}
+  s.combat=null;s.encounter=null;s.queue=[];s.phase='end';
+  if(!p.dead&&!p.respawn){
+    if(result==='loss')for(const id of cards)if(AUTOMATIC_FIENDS.has(cardName(id)))fiendLoss(s,p,id,fx);
+    if(result==='win'&&cards.some(id=>cardName(id)==='Santa Claws')&&s.purchase.length){
+      const item=ask({player:p.id,message:'Santa Claws · choose your reward.',choices:uniqueCards(s.purchase).map(id=>({id,label:`Take ${cardName(id)}`}))});
+      s.purchase.splice(s.purchase.indexOf(item),1);receive(s,p,item);overflow(s,p);
+    }
+    if(needsRuling)ruling(s,p,cards,`Combat result: ${result}. Apply only the card's additional effect for that result.`);
+  }
   endCheck(s);
 }
 function rollCombat(s: State) {
@@ -972,7 +963,7 @@ function rollCombat(s: State) {
         f.mortal,
         a.finisher,
         a.escape,
-        b?.suppress,
+        b?.suppress || f.cards.some(id=>cardName(id)==='R. O. C.'),
       ) + (a.modifier ?? 0),
     qv = q
       ? score(
@@ -1007,7 +998,7 @@ function rollCombat(s: State) {
   if (
     !q &&
     f.cards.some((id) =>
-      ["Corrupt Cops", "Police Chief"].includes(cardName(id)),
+      ["Corrupt Cop", "Corrupt Cops", "Police Chief"].includes(cardName(id)),
     ) &&
     has(s, p, "defeat_police")
   )
@@ -1058,6 +1049,7 @@ function rollCombat(s: State) {
         ? `${p.name}: ${r}+${pv}; ${q.name}: ${t}+${qv}. ${diff === 0 ? "Tie." : `${diff > 0 ? p.name : q.name} wins combat.`}`
         : `${p.name}: ${r}+${pv} against ${strength}. ${diff > 0 ? "Win." : diff < 0 ? "Loss." : "Tie."}`,
   );
+  s.lastCombat={sequence:(s.lastCombat?.sequence??0)+1,actor:p.id,opponent:q?.name??(f.ending?'Final challenge':f.cards.map(cardName).join(' + ')),dice:s.lastDice,total:r+pv,opposingTotal:q?t+qv:strength,result:diff>0?'win':diff<0?'loss':'tie'};
   f.boosts = {};
   if (f.ending) {
     endingCombat(s, p, diff);
@@ -1604,12 +1596,7 @@ function boardEffects(s: State, p: Player, effects: any[], bonus = 0) {
         break;
       case "discard_homie":
       case "discard_item":
-        ruling(
-          s,
-          p,
-          [],
-          `Discard one ${e.type === "discard_item" ? "Item" : "Homie"} of your choice, if you have one.`,
-        );
+        discardChoice(s,p,cardRuntime(s),e.type === 'discard_item'?'items':'homies');
         break;
       case "assassination_contract":
       case "mirror_roll_duel":
@@ -1624,10 +1611,51 @@ function boardEffects(s: State, p: Player, effects: any[], bonus = 0) {
   }
   endCheck(s);
 }
+function cardRuntime(s: State): CardRuntime {
+  return {
+    damage: (p,n) => damage(s,p,n), heal,
+    cash: (p,n) => { if(n>0) gainCash(p,n); else p.cash=Math.max(0,p.cash+n); },
+    bonus: cb, loseTurn: p=>loseTurn(s,p),
+    bone: p=>{
+      drawBone(s,p);
+      // Resolve nested Bone choices inside the same saved transaction.
+      for(let i=0;s.decision && i<30;i++){
+        const d=s.decision, q=s.players.find(q=>q.id===d.actor)!;
+        s.decision=null;s.phase=d.returnPhase;
+        if(d.kind==='bone-draw'){
+          const answer=ask({player:q.id,message:'A Bone card is coming.',choices:[{id:'skate',label:'Use Skateboard · roll d10'},{id:'draw',label:'Draw the Bone card'}]});
+          if(answer==='skate'){const r=nonCombatDie(s,q,10);s.lastDice=[r];usedItem(s,q,heldId(q,'Skateboard')!);addLog(s,`${q.name} rolled ${r} with Skateboard.`);if(r>=4)continue;}
+          drawBone(s,q,true);
+        }else{
+          const targets=s.players.filter(t=>t.id!==q.id&&!t.dead&&!t.respawn&&!absent(t));
+          if(targets.length){const target=ask({player:q.id,message:'Choose who draws the transferred Bone.',choices:targets.map(t=>({id:t.id,label:`Transfer Bone to ${t.name}`}))});drawBone(s,s.players.find(t=>t.id===target)!);}
+        }
+      }
+    },
+    remove: (p,id)=>removeCard(s,p,id), receive:(p,id,homie)=>receive(s,p,id,homie),
+    transfer:(from,to,id,homie)=>transfer(s,from,to,id,homie), discard:id=>discard(s,id),removeBoard:ids=>removeBoard(s,ids),
+    move:(p,region,pos)=>{
+      p.region=region;p.pos=pos;cureOnArrival(s,p);delivery(s,p);
+      if(p.id===current(s).id){s.encounter=null;s.queue=[];s.locationDone=false;arrive(s,p);}
+      addLog(s,`${p.name} moved to ${spaceName(region,pos)}.`);
+    },
+    die:(p,sides=6)=>{const r=nonCombatDie(s,p,sides);s.lastDice=[r];addLog(s,`${p.name} rolled ${r} on d${sides}.`);return r;},
+    log:text=>addLog(s,text),
+  };
+}
 function resolveCard(s: State, p: Player) {
   const id = s.encounter;
   need(id, "There is no pending card.");
   const c = card(id!);
+  if (AUTOMATIC_ENCOUNTERS.has(c.name)) {
+    if (c.kind === 'event') { removeBoard(s, [id!]); discard(s, id!); }
+    afterEncounter(s);
+    encounterEffect(s, p, id!, cardRuntime(s));
+    if (p.dead || p.respawn) { s.encounter=null; s.queue=[]; s.phase='end'; }
+    endCheck(s);
+    for (const q of s.players) if (!q.dead) overflow(s,q);
+    return;
+  }
   if (c.kind === "fiend") {
     combatStart(s, p, [id!]);
     return;
@@ -1647,6 +1675,7 @@ function combatChoice(s: State, p: Player, a: Action) {
   );
   need(!f.choices[p.id], "Your combat choice is already locked.");
   const weapon = a.weapon ?? null;
+  need(!weapon || !f.cards.some(id=>cardName(id)==='R. O. C.'), 'R. O. C. does not allow Weapons or Homies in this fight.');
   need(
     !weapon || (p.items.includes(weapon) && card(weapon).weapon),
     "Choose a Weapon you hold.",
@@ -2499,10 +2528,55 @@ function applyRuling(s: State, actor: Player, a: Action) {
   );
   endCheck(s);
 }
+function clearPending(s: State) {
+  s.phase='end';s.choices=[];s.encounter=null;s.queue=[];
+  s.combat=null;s.penalty=null;s.ruling=null;s.trade=null;s.overflow=null;s.decision=null;s.endingPending=null;
+  delete s.flow;delete s.itemPrompt;delete s.recoil;delete s.pendingVictory;
+}
+function leaveGame(s: State, actorId: string) {
+  const p=s.players.find(q=>q.id===actorId);
+  need(p&&!p.left, 'You have already left this table.');
+  need(s.rulesVersion===3, 'This saved table uses an earlier rules edition.');
+  need(s.status!=='finished', 'This game has finished. Return to the menu instead.');
+  const leaving=p!,wasCurrent=current(s)?.id===leaving.id;
+  leaving.left=true;leaving.dead=true;leaving.ready=false;leaving.extraTurns=0;
+  delete leaving.absentUntil;delete leaving.respawn;delete leaving.casketRecovery;
+  if(s.flow){delete s.flow;addLog(s,'A player left while a card response was pending. The uncommitted action was cancelled; choose your action again.');}
+  if(s.status==='lobby'){
+    const index=s.players.indexOf(leaving);
+    if(s.players.length>1){s.players.splice(index,1);s.turn=0;}
+  }else{
+    loseAll(s,leaving,'items');loseAll(s,leaving,'homies');loseAll(s,leaving,'bones');
+    leaving.cash=0;if(s.endingHolder===leaving.id)s.endingHolder=null;
+    if(wasCurrent)clearPending(s);
+    else{
+      if(s.trade&&[s.trade.from,s.trade.to].includes(leaving.id))s.trade=null;
+      if((s.combat&&[s.combat.attacker,s.combat.defender].includes(leaving.id))||(s.penalty&&[s.penalty.winner,s.penalty.loser].includes(leaving.id))){s.combat=null;s.penalty=null;s.phase='end';s.encounter=null;s.queue=[];delete s.recoil;delete s.pendingVictory;addLog(s,'Combat ended because a participant left. No combat reward was awarded.');}
+      if(s.overflow?.player===leaving.id){s.phase=s.overflow.returnPhase;s.overflow=null;}
+      if(s.ruling?.actor===leaving.id){s.phase=s.ruling.returnPhase;s.ruling=null;}
+      if(s.decision?.actor===leaving.id){s.phase=s.decision.returnPhase;s.decision=null;}
+      if(s.itemPrompt?.player===leaving.id){s.phase=s.itemPrompt.returnPhase;delete s.itemPrompt;}
+      if(s.endingPending===leaving.id){s.endingPending=null;s.phase='end';}
+    }
+  }
+  for(const q of s.players){if(q.lootFor===leaving.id){delete q.lootFor;delete q.lootTurns;}}
+  const humans=s.players.filter(q=>!q.left&&!q.bot);
+  if(s.host===leaving.id&&humans.length){s.host=(humans.find(q=>!q.dead)??humans[0]).id;addLog(s,`${s.players.find(q=>q.id===s.host)!.name} is now the host.`);}
+  addLog(s,`${leaving.name} left the ${s.status==='lobby'?'table':'match permanently and forfeited their seat'}.`);
+  addMoment(s,{kind:'departure',player:leaving.id,title:`${leaving.name} left the table`,detail:humans.length?`Host: ${s.players.find(q=>q.id===s.host)?.name}. Play continues with the remaining players.`:'The table is closed.'});
+  if(!humans.length){clearPending(s);s.status='finished';s.endedBecause='abandoned';s.winner=null;s.winners=[];addLog(s,'The table closed because no human players remain.');return;}
+  if(s.status==='playing'){
+    endCheck(s);
+    if((s.status as State['status'])==='finished'){clearPending(s);return;}
+    if(wasCurrent||s.phase==='waiting')nextTurn(s);
+  }
+}
 export function applyAction(s: State, actorId: string, a: Action) {
+  const before=structuredClone(s);
+  if(a.type==='leave-game'){leaveGame(s,actorId);recordActivity(before,s);return;}
   if (a.type === "end-game") {
     // Authenticate the actual session owner, never the client-supplied actor.
-    const host = s.players.find(p => p.id === actorId && p.id === s.host);
+    const host = s.players.find(p => p.id === actorId && p.id === s.host && !p.left);
     need(host, "Only the host can end the game for everyone.");
     need(s.rulesVersion === 3, "This saved table uses an earlier rules edition.");
     need(s.status !== "finished", "This game has already ended.");
@@ -2527,6 +2601,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
     return;
   }
   need(s.status !== "finished", "This game has finished.");
+  need(!s.players.find(p=>p.id===actorId)?.left, 'You left this match. You can watch or open a new table.');
   if (s.flow) {
     const flow = structuredClone(s.flow),
       p = s.players.find((p) => p.id === flow.prompt.player),
@@ -2559,6 +2634,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
       applyCore(s, actorId, a);
       finishCombatCosts(s);
     });
+  recordActivity(before,s);
 }
 function finishCombatCosts(s: State) {
   if (s.penalty || !s.recoil?.length) return;
@@ -2657,6 +2733,12 @@ function applyCore(s: State, actorId: string, a: Action) {
           s.players.push(b);
           return;
         }
+      case "start-practice":
+        need(p.id===s.host,'Only the host starts a practice game.');
+        p.ready=true;
+        if(s.players.length===1)applyCore(s,actorId,{type:'add-bot'});
+        applyCore(s,actorId,{type:'start'});
+        return;
       case "start":
         need(p.id === s.host, "Only the host starts the game.");
         need(
@@ -3431,6 +3513,7 @@ function applyCore(s: State, actorId: string, a: Action) {
     for (const q of s.players) if (!q.dead) overflow(s, q);
 }
 export function options(s: State, id: string): Option[] {
+  if(s.players.find(p=>p.id===id)?.left)return [];
   if (s.flow)
     return s.flow.prompt.player === id
       ? s.flow.prompt.choices.map((c) => ({
