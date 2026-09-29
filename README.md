@@ -1,6 +1,6 @@
 # Shangri-La Online
 
-An unofficial multiplayer **assisted tabletop** for The Quest for Shangri-La. This is not an official release, a visual replica, or a fully automated implementation of every physical-game interaction.
+The official multiplayer beta of The Quest for Shangri-La, presented as an **assisted tabletop**. Visual fidelity and automation of every physical-game interaction are still in progress.
 
 ## Corrected rules edition
 
@@ -36,7 +36,7 @@ Joined players can chat in the lobby and during a game. Messages persist across 
 - [Community Tabletop Simulator project](https://steamcommunity.com/sharedfiles/filedetails/?id=3079987608)
 - Each card record in `lib/rules/cards.json` links to its source photograph. `lib/rules/characters.json` and `lib/rules/spaces.json` hold the researched character/board records. Descriptions are newly worded mechanical summaries, not a verbatim rulebook or card-text transcription.
 
-No affiliation with, endorsement by, or official status from ICP/Psychopathic Records or the original game’s creators is claimed.
+This is a beta release; the fidelity and automation limits described above remain in progress.
 
 ## Development
 

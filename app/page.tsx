@@ -923,7 +923,7 @@ export default function Home() {
             THE QUEST FOR <strong>SHANGRI-LA</strong>
           </div>
         </div>
-        <span className="edition">UNOFFICIAL · ASSISTED TABLETOP</span>
+        <span className="edition">OFFICIAL BETA · ASSISTED TABLETOP</span>
         <div className="row">
           {room && (
             <button className="quiet" onClick={closeView} disabled={busy}>
@@ -1694,8 +1694,8 @@ export default function Home() {
               photographs. Rules are paraphrased. Special effects and their
               timing still need manual resolution. The rulebook lists 110
               Detroit and 70 Dark Carnival cards; this recovered set contains
-              101 and 69, with unresolved duplicates. This is not an official or
-              perfect replica.
+              101 and 69, with unresolved duplicates. This official beta is
+              still being checked against the complete physical game.
             </p>
             <button
               className="quiet wide"
@@ -1715,7 +1715,7 @@ export default function Home() {
             </button>
           </div>
           <p className="notice">
-            Unofficial assisted tabletop. Special card effects require players
+            Official beta · assisted tabletop. Special card effects require players
             to apply the displayed rules using shared controls. Automatic rules
             do not cover every interaction.
           </p>

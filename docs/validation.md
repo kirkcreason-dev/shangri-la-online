@@ -16,9 +16,9 @@ Old rules editions remain readable and require a new table for edition 3. No exi
 1. Reconcile the printed inventory (110/90/70 Action cards, 42 Purchase) with recovered records (101/90/69, 40 Purchase). Identify missing cards and confirm duplicate quantities; resolve the three provisional titles.
 2. Automate and verify the remaining 126 component records with conditional/manual effects, plus exceptional cross-card interactions. For example, a Random Bone Generator result of zero has no printed result in some tables; the game opens a logged ruling rather than inventing one. Table dice are explicitly raw and require manual modifiers.
 3. Verify the disclosed timing conventions against publisher rulings or consistent physical play. Run complete multi-person acceptance games, including mobile use and real disconnects. Pending card responses currently pause the table until their controlling seat returns; there is no automatic timeout.
-4. Replace the imperfect board photograph and reconcile visual components before making any replica claim. No official status is claimed.
+4. Replace the imperfect board photograph and reconcile visual components before making any replica claim. Official beta branding does not establish complete game fidelity.
 
-This update is a private assisted-tabletop build. Passing these checks does not make it a complete or release-ready replica.
+This is an official beta with assisted tabletop play, now publicly accessible. Passing these checks does not make it a complete or release-ready replica.
 
 ## Firebase rooms and chat update
 

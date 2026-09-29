@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Shangri-La Online · Unofficial",
-  description: "An unofficial multiplayer adaptation. Gather your friends, explore three regions, and reach Shangri-La.",
+  title: "Shangri-La Online · Official Beta",
+  description: "The official multiplayer beta of The Quest for Shangri-La. Gather your friends, explore three regions, and reach Shangri-La.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
