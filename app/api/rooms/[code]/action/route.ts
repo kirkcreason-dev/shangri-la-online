@@ -1,3 +1,0 @@
-import {applyAction,runBots,publicState} from '@/lib/game';
-import {session,readRoom,saveRoom,body,result,fail,ConflictError} from '@/lib/store';
-export async function POST(req:Request,c:{params:Promise<{code:string}>}){try{const a=await body(req),sid=await session(),{code}=await c.params;const s=await readRoom(code.toUpperCase());if(!s)return result({error:'That room was not found.'},404);const p=s.players.find(p=>p.session===sid);if(!p)return result({error:'Join the table to play.'},403);if(!Number.isInteger(a.version)||a.version!==s.rev)throw new ConflictError('The table changed. Your game has refreshed; try again.');const rev=s.rev;applyAction(s,p.id,a);runBots(s);await saveRoom(s,rev);return result(publicState(s,sid))}catch(e){return fail(e)}}
