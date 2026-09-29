@@ -923,7 +923,7 @@ export default function Home() {
             THE QUEST FOR <strong>SHANGRI-LA</strong>
           </div>
         </div>
-        <span className="edition">OFFICIAL BETA · ASSISTED TABLETOP</span>
+        <span className="edition">OFFICIAL BETA</span>
         <div className="row">
           {room && (
             <button className="quiet" onClick={closeView} disabled={busy}>
@@ -1715,7 +1715,7 @@ export default function Home() {
             </button>
           </div>
           <p className="notice">
-            Official beta · assisted tabletop. Special card effects require players
+            Official beta. Special card effects require players
             to apply the displayed rules using shared controls. Automatic rules
             do not cover every interaction.
           </p>
@@ -1751,7 +1751,7 @@ export default function Home() {
               slots. End the turn after resolving the encounter.
             </li>
           </ol>
-          <h3>What is automated</h3>
+          <h3>What the game handles</h3>
           <p>
             Character starting stats and equipment, movement paths and tolls,
             ordinary combat, natural 1/10 results, weapon breakage, basic shops,

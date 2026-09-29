@@ -3868,7 +3868,7 @@ export function publicState(s: State, session: string) {
       endings: 10,
       boardSpaces: 60,
     },
-    mode: "Assisted tabletop",
+    mode: "Online tabletop",
     legacy: false,
   };
 }

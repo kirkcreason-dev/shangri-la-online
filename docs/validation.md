@@ -18,7 +18,7 @@ Old rules editions remain readable and require a new table for edition 3. No exi
 3. Verify the disclosed timing conventions against publisher rulings or consistent physical play. Run complete multi-person acceptance games, including mobile use and real disconnects. Pending card responses currently pause the table until their controlling seat returns; there is no automatic timeout.
 4. Replace the imperfect board photograph and reconcile visual components before making any replica claim. Official beta branding does not establish complete game fidelity.
 
-This is an official beta with assisted tabletop play, now publicly accessible. Passing these checks does not make it a complete or release-ready replica.
+This is an official online beta, now publicly accessible. Passing these checks does not make it a complete or release-ready replica.
 
 ## Firebase rooms and chat update
 

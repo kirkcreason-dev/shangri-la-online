@@ -1,6 +1,6 @@
 # Shangri-La Online
 
-The official multiplayer beta of The Quest for Shangri-La, presented as an **assisted tabletop**. Visual fidelity and automation of every physical-game interaction are still in progress.
+The official multiplayer beta of The Quest for Shangri-La. Play together online with shared rooms, saved turns, and room chat. Visual fidelity and support for every physical-game interaction are still in progress.
 
 ## Corrected rules edition
 
@@ -14,7 +14,7 @@ New tables use version 3. Existing prototype rooms remain readable and are prese
 - Item inventories, Homies, Purchase stock, trade offers requiring acceptance, first-death replacement characters, and all ten ending structures are represented.
 - New rooms can be saved in Firebase Firestore; existing rooms remain in D1. Session cookies identify seats, spectators cannot act, and revision checks reject concurrent stale writes. Deck order and unrevealed endings stay on the server.
 
-## Assisted effects and remaining fidelity limits
+## Table controls and remaining fidelity limits
 
 The game automates movement, core combat, common board effects, basic purchases, and several character powers. **126 component records still require some table adjudication, chiefly Events, Fiends and card locations.** Each component shows its paraphrased mechanics and source link. Logged controls let the resolving player or host roll dice, adjust stats, move tokens, transfer/discard/retrieve cards, and record conditions. Conditional combat modifiers are explicitly declared. These controls assume a cooperative table; they are not an anti-cheat rules engine.
 
@@ -40,7 +40,7 @@ This is a beta release; the fidelity and automation limits described above remai
 
 ## Development
 
-Node 22.13+ (Node 24 recommended). Install dependencies with `npm run install:ci`, apply the D1 migration using the configured local tooling, and run `npm run dev -- --port 4179`. Production builds use the bundled Sites build workflow. The deployment configuration is `.openai/hosting.json`.
+Node 22.13+ (Node 24 recommended). Install dependencies with `npm run install:ci`, apply the D1 migration using the configured local tooling, and run `npm run dev -- --port 4179`. Production builds use the configured hosting workflow.
 
 `npm test` checks character setup, finite stock, turn permissions, passage costs, combat, trade consent, table adjudication, inventory limits, death, ending structures, and legacy-room preservation. Type checking: `npx tsc --noEmit`.
 

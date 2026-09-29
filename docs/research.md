@@ -1,6 +1,6 @@
 # Component research — September 29, 2026
 
-The scanned printed rulebook and a community Tabletop Simulator inventory are the evidence behind this assisted edition. Their card totals disagree; the app is not a complete retail replica.
+The scanned printed rulebook and a community Tabletop Simulator inventory are the evidence behind this online edition. Their card totals disagree; the app is not a complete retail replica.
 
 ## Sources
 
