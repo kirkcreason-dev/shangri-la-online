@@ -8,13 +8,15 @@ The official multiplayer beta of The Quest for Shangri-La. Play together online 
 
 New tables use version 3. Existing prototype rooms remain readable and are preserved; they cannot be converted into a mix of incompatible rule sets.
 
-- All 18 character records use researched starting Life, Combat Bonus, Cash, allegiance, location, equipment, and paraphrased power descriptions.
+- All 16 playable character records use researched starting Life, Combat Bonus, Cash, allegiance, location, equipment, and paraphrased power descriptions.
 - All 60 board spaces have audited effects. The Pipeline costs $100 inward. The Portal costs one Item inward. Magic Ninja waives tolls; Shangri-La still requires 15 base Combat Bonus.
 - The recovered Action decks contain 101 Detroit, 90 Nethervoid, and 69 Dark Carnival component records. Names, numbers and mechanical summaries replace the invented 48-card prototype deck.
 - The Purchase supply contains 40 Item cards representing 14 types. Thirteen Bone cards are included. Cash objects found in the community Purchase stack are excluded from the shop supply.
 - Combat supports one selected Weapon, ranged attacks, both players declaring equipment before rolling, natural 1/10 results, weapon breakage, optional armor, conditional modifiers, and the winner’s choice of PvP penalty.
 - Item inventories, Homies, Purchase stock, trade offers requiring acceptance, first-death replacement characters, and all ten ending structures are represented.
 - New rooms can be saved in Firebase Firestore; existing rooms remain in D1. Browser sessions identify seats, spectators cannot act, and revision checks reject concurrent stale writes. Deck order and unrevealed endings stay on the server.
+
+Jamie Madrox and Monoxide are excluded from the playable roster, practice opponents, and replacement-character draws. Existing saved seats retain their rules so ongoing games can continue.
 
 ## Table controls and remaining fidelity limits
 
@@ -27,6 +29,10 @@ Version 3 integrates Casket resurrection before possessions are lost, Psychopath
 Timing conventions are visible in the rules panel: timed Bones count future full turns and apply immediately, the left-hand controller follows fixed lobby order, King High Bone lasts ten real minutes including disconnect time, Amputation caps Items at three even with Backpack, and Concussion clears on an unmodified movement total of six. These fill ambiguities in the printed cards.
 
 The community inventory repeats a 19-card Detroit atlas. Three Detroit title readings remain uncertain. Page 1 of the scanned rulebook lists 110 Detroit, 90 Nethervoid, 70 Dark Carnival, 42 Purchase and 13 Bone cards. The recovered records therefore fall short, and their identities/copy counts have not been certified against a complete physical retail set. Starting equipment is allocated from this observed finite supply; combinations exhausting it are rejected rather than manufacturing cards. Card artwork is not reproduced. The board photograph retains glare and cropping. Online rooms are publicly accessible by invitation link.
+
+## Board controls
+
+The board follows your piece, pans and pivots as you move, and frames your legal destinations. Use Follow turn to watch the active player, Full board for the overview, or drag to explore. Rotate with the arrow buttons or Shift-drag; use the zoom buttons or pinch and twist with two fingers. The minimap keeps your place visible. Keyboard controls work with the board focused: arrows pan, +/− zoom, [/] rotate, and Home returns to your piece. Movement effects respect reduced-motion settings.
 
 ## Online play and chat
 

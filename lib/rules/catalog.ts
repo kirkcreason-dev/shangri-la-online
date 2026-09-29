@@ -3,8 +3,9 @@ import board from "../board.json" with { type: "json" };
 import cards from "./cards.json" with { type: "json" };
 import spaces from "./spaces.json" with { type: "json" };
 import type { Card, Player, State } from "./types.ts";
-export const CHARACTERS = characters.map((c) => c.name);
-export const ROSTER = characters;
+const retiredCharacters = new Set(["Jamie Madrox", "Monoxide"]);
+export const ROSTER = characters.filter((c) => !retiredCharacters.has(c.name));
+export const CHARACTERS = ROSTER.map((c) => c.name);
 export const REGIONS = ["Detroit", "Nethervoid", "Dark Carnival"];
 export const COLORS = [
   "#e7c375",
@@ -82,8 +83,10 @@ export const ENDINGS = [
   },
 ];
 export function character(name: string) {
-  const c = ROSTER.find((c) => c.name === name);
-  if (!c) throw new Error("Choose one of the 18 characters.");
+  // Retain saved-character rules so existing tables remain readable.
+  // New seats and replacement draws use only the active roster above.
+  const c = characters.find((c) => c.name === name);
+  if (!c) throw new Error("Choose a character from the available roster.");
   return c;
 }
 export function card(id: string) {

@@ -93,6 +93,7 @@ export function newPlayer(
   char: string,
   index: number,
 ): Player {
+  need(CHARACTERS.includes(char), "Choose a character from the available roster.");
   const c = character(char),
     start = findSpace(c.startingSpace);
   return {
@@ -3864,7 +3865,7 @@ export function publicState(s: State, session: string) {
         : null,
     coverage: {
       actionCards: 260,
-      characters: 18,
+      characters: CHARACTERS.length,
       endings: 10,
       boardSpaces: 60,
     },

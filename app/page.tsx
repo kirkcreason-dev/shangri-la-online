@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Board, { spaceName } from "@/components/game/Board";
 import {
   CHARACTERS,
-  ROSTER,
   REGIONS,
   COUNTS,
   CARDS,
@@ -983,7 +982,10 @@ export default function Home() {
             </div>
           )}
           <Board
+            key={room?.code ?? "preview"}
             players={room?.players}
+            focus={myTurn ? p?.id : me?.id}
+            dice={room?.lastDice}
             choices={choices}
             active={room?.status === "playing" ? active?.id : undefined}
             disabled={busy}
@@ -994,7 +996,7 @@ export default function Home() {
               60 mapped spaces ·{" "}
               {room?.space?.name ?? "Original board reference"}
             </span>
-            <span>18 characters · 10 endings</span>
+            <span>{CHARACTERS.length} characters · 10 endings</span>
           </div>
           {room?.ending && (
             <section className="panel ending-panel">

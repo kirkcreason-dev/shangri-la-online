@@ -8,6 +8,7 @@ import {
   destinations,
   CARDS,
   ROSTER,
+  CHARACTERS,
   ENDINGS,
   card,
   cardName,
@@ -83,8 +84,8 @@ function fight(s, p, q, values = [10, 1], extra = {}) {
     applyAction(s, q.id, { type: "combat-choice", weapon: null }),
   );
 }
-test("all researched components are present without a fabricated encounter deck", () => {
-  assert.equal(ROSTER.length, 18);
+test("active roster and researched encounter decks retain their expected counts", () => {
+  assert.equal(ROSTER.length, 16);
   assert.equal(ENDINGS.length, 10);
   assert.deepEqual(
     [0, 1, 2].map((r) =>
@@ -108,7 +109,7 @@ test("all researched components are present without a fabricated encounter deck"
     false,
   );
 });
-test("all 18 characters start with audited unique records and starting Items", () => {
+test("all playable characters start with audited unique records and starting Items", () => {
   for (const c of ROSTER) {
     const p = newPlayer("s", c.name, c.name, 0);
     assert.equal(p.life, c.startingLife);
@@ -542,4 +543,29 @@ test("legacy rooms are readable but cannot be changed into mixed rules", () => {
   assert.equal(v.legacy, true);
   assert.ok(v.players.every((p) => !("session" in p)));
   assert.throws(() => applyAction(s, s.host, { type: "roll" }), /old rules/);
+});
+
+
+test("removed characters cannot be created or selected through lobby actions", () => {
+  const s = makeRoom("ABC234", "s0", "First", "Violent J");
+  for (const name of ["Jamie Madrox", "Monoxide"]) {
+    assert.ok(!CHARACTERS.includes(name));
+    assert.throws(() => newPlayer("s1", "Guest", name, 1), /available roster/);
+    assert.throws(() => applyAction(s, s.host, {type: "character", character: name}), /available roster/);
+    assert.equal(s.players[0].character, "Violent J");
+  }
+  while (s.players.length < 6) applyAction(s, s.host, {type: "add-bot"});
+  assert.ok(s.players.every(p => CHARACTERS.includes(p.character)));
+  assert.equal(publicState(s, "s0").coverage.characters, 16);
+});
+
+test("saved seats using retired character rules still reconnect", () => {
+  for (const name of ["Jamie Madrox", "Monoxide"]) {
+    const s = game();
+    s.players[0].character = name;
+    const view = publicState(s, "s0");
+    assert.equal(view.me, s.host);
+    assert.equal(view.players[0].character, name);
+    assert.ok(view.yourPowers.length > 0);
+  }
 });
