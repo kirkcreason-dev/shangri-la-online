@@ -21,8 +21,22 @@ type PublicRoom = Omit<
   | "endingPool"
   | "boneDeck"
   | "boneDiscard"
+  | "peek"
 > & {
-  players: Omit<Player, "session">[];
+  players: (Omit<Player, "session"> & {
+    controller: string;
+    capacity: number;
+    conditionDetails: {
+      id: string;
+      name: string;
+      rules: string;
+      turns: number | null;
+      branch: string | null;
+      controller: string | null;
+    }[];
+  })[];
+  peek: string | null;
+  serverTime: number;
   me: string | null;
   control: string | null;
   legacy: boolean;
@@ -104,7 +118,7 @@ function CombatForm({
     [modifier, setModifier] = useState(0),
     [reason, setReason] = useState("");
   const f = room.combat!;
-  const powers = characterRecord(p.character).powers;
+  const powers = room.yourPowers;
   const has = (id: string) => powers.some((x) => x.id === id);
   if (f.choices[p.id])
     return <p>Your combat choice is locked. Waiting for the other player.</p>;
@@ -261,7 +275,8 @@ function TableControls({
     [recipient, setRecipient] = useState(""),
     [region, setRegion] = useState(0),
     [pos, setPos] = useState(0),
-    [deck, setDeck] = useState("0");
+    [deck, setDeck] = useState("0"),
+    [winners, setWinners] = useState<string[]>([]);
   const chosen = room.players.find((x) => x.id === target) ?? p;
   return (
     <div className="ruling-panel">
@@ -270,6 +285,8 @@ function TableControls({
       <p className="small">
         These are shared tabletop controls. Follow the card, agree on choices
         with the table, and record each adjustment. The game logs every action.
+        Table dice are raw rolls; apply noncombat modifiers such as Random Bone
+        Generator when interpreting them.
       </p>
       <form
         className="stack"
@@ -286,6 +303,7 @@ function TableControls({
             pos,
             deck: deck === "bone" ? "bone" : Number(deck),
             reason: reason || room.ruling?.reason || "Card effect",
+            winners: stat === "win" && winners.length ? winners : undefined,
           });
         }}
       >
@@ -348,6 +366,29 @@ function TableControls({
               onChange={(e) => setAmount(Number(e.target.value))}
             />
           </label>
+        )}
+        {stat === "win" && (
+          <fieldset>
+            <legend>Winners (defaults to selected player)</legend>
+            {room.players
+              .filter((q) => !q.dead)
+              .map((q) => (
+                <label className="check" key={q.id}>
+                  <input
+                    type="checkbox"
+                    checked={winners.includes(q.id)}
+                    onChange={(e) =>
+                      setWinners(
+                        e.target.checked
+                          ? [...winners, q.id]
+                          : winners.filter((id) => id !== q.id),
+                      )
+                    }
+                  />
+                  {q.name}
+                </label>
+              ))}
+          </fieldset>
         )}
         {["discard", "transfer", "retrieve"].includes(stat) && (
           <label>
@@ -741,7 +782,11 @@ export default function Home() {
     p = room?.players.find((p) => p.id === room.control) ?? me,
     active = room?.players[room.turn],
     myTurn =
-      !!p && p.id === active?.id && room?.status === "playing" && !room.legacy,
+      !!p &&
+      room?.control === p.id &&
+      p.id === active?.id &&
+      room?.status === "playing" &&
+      !room.legacy,
     host = me?.id === room?.host,
     choices = myTurn ? (room?.choices ?? []) : [],
     roster = characterRecord(character);
@@ -749,10 +794,14 @@ export default function Home() {
   const inCombat =
     room?.combat &&
     p &&
+    room.control === p.id &&
     [room.combat.attacker, room.combat.defender].includes(p.id);
   const canRule = room?.ruling && p && (room.ruling.actor === p.id || host);
   const canUse =
     (myTurn || !!inCombat) &&
+    !p?.absentUntil &&
+    !me?.absentUntil &&
+    !p?.respawn &&
     ["roll", "move", "encounter", "end", "combat", "ending"].includes(
       room?.phase ?? "",
     );
@@ -833,10 +882,10 @@ export default function Home() {
           )}
           {room?.legacy && (
             <div className="notice">
-              <strong>This saved table uses the old prototype rules.</strong>
+              <strong>This saved table uses an earlier rules edition.</strong>
               <p>
                 Its history is preserved. Create a new table to play with the
-                researched cards, character records and endings.
+                latest rules and timing fixes.
               </p>
               <button className="primary" onClick={closeView}>
                 Create a corrected table
@@ -906,6 +955,22 @@ export default function Home() {
                       {q.skip ? ` · ${q.skip} missed turn(s)` : ""}
                     </p>
                     {q.notes && <p className="notice">{q.notes}</p>}
+                    {q.absentUntil && (
+                      <p className="notice">
+                        King High Bone: returns in{" "}
+                        {Math.max(
+                          0,
+                          Math.ceil((q.absentUntil - room.serverTime) / 1000),
+                        )}{" "}
+                        seconds.
+                      </p>
+                    )}
+                    {q.controller !== q.id && (
+                      <p className="notice">
+                        Controlled by{" "}
+                        {room.players.find((p) => p.id === q.controller)?.name}.
+                      </p>
+                    )}
                     {!room.legacy && (
                       <>
                         <h4>
@@ -1157,13 +1222,15 @@ export default function Home() {
                 <>
                   <hr className="panel-rule" />
                   <span className="eyebrow">
-                    {p?.bot
-                      ? "HOST CONTROLS PRACTICE OPPONENT"
-                      : myTurn
-                        ? "YOUR TURN"
-                        : me.dead
-                          ? "SPECTATING"
-                          : `WAITING FOR ${active?.name.toUpperCase()}`}
+                    {p && me && p.id !== me.id && !p.bot
+                      ? "YOU CONTROL " + p.name.toUpperCase()
+                      : p?.bot
+                        ? "HOST CONTROLS PRACTICE OPPONENT"
+                        : myTurn
+                          ? "YOUR TURN"
+                          : me.dead
+                            ? "SPECTATING"
+                            : `WAITING FOR ${active?.name.toUpperCase()}`}
                   </span>
                   {room.lastDice?.length > 0 && (
                     <div
@@ -1175,6 +1242,23 @@ export default function Home() {
                           {d}
                         </span>
                       ))}
+                    </div>
+                  )}
+                  {room.endingPending && (
+                    <p className="notice">
+                      Resolve Psychopathic Ring before this ending takes effect.
+                    </p>
+                  )}
+                  {room.phase === "waiting" && (
+                    <p className="notice">
+                      All remaining players are temporarily absent. The table
+                      resumes when a timer expires.
+                    </p>
+                  )}
+                  {room.peek && (
+                    <div className="private-peek">
+                      <h3>Private Crystal Ball view</h3>
+                      <CardView id={room.peek} />
                     </div>
                   )}
                   {room.phase === "encounter" &&
@@ -1336,9 +1420,29 @@ export default function Home() {
           {room && p && !room.legacy && (
             <section className="panel">
               <span className="eyebrow">
-                {p.bot ? "PRACTICE OPPONENT" : "YOUR CHARACTER"}
+                {p.bot
+                  ? "PRACTICE OPPONENT"
+                  : p.id === me?.id
+                    ? "YOUR CHARACTER"
+                    : `${p.name.toUpperCase()} · YOU CONTROL THIS TURN`}
               </span>
               <h2>{p.character}</h2>
+              {p.absentUntil && (
+                <p className="notice" role="status">
+                  King High Bone: you return in{" "}
+                  {Math.max(
+                    0,
+                    Math.ceil((p.absentUntil - room.serverTime) / 1000),
+                  )}{" "}
+                  seconds. Participation resumes after the timer.
+                </p>
+              )}
+              {p.casketRecovery && (
+                <p className="notice">
+                  Casket returns you to Knapp Cemetery with your possessions
+                  next turn.
+                </p>
+              )}
               <p>
                 {p.allegiance} · ♥ {p.life}/{p.maxLife} · CB {p.bonus} · $
                 {p.cash}
@@ -1369,8 +1473,7 @@ export default function Home() {
               </details>
               {p.notes && <p className="notice">{p.notes}</p>}
               <h3>
-                Items · {p.items.length}/
-                {p.items.some((id) => cardName(id) === "Backpack") ? 9 : 6}
+                Items · {p.items.length}/{p.capacity}
               </h3>
               {p.items.length === 0 && <p className="small">No Items.</p>}
               {p.items.map((id) => (
@@ -1407,6 +1510,15 @@ export default function Home() {
                 />
               ))}
               {p.bones.length > 0 && <h3>Bone effects</h3>}
+              {p.conditionDetails?.map((c) => (
+                <p className="small" key={c.id}>
+                  {c.name}
+                  {c.turns !== null
+                    ? ` · ${c.turns} future turn(s) remaining`
+                    : ""}
+                  {c.branch ? ` · ${c.branch}` : ""}
+                </p>
+              ))}
               {p.bones.map((id) => (
                 <CardView
                   key={id}
@@ -1460,8 +1572,10 @@ export default function Home() {
             <p className="small">
               Reconstructed from the scanned rulebook and community component
               photographs. Rules are paraphrased. Special effects and their
-              timing need manual resolution, and the recovered card counts have
-              unresolved duplicates. This is not an official or perfect replica.
+              timing still need manual resolution. The rulebook lists 110
+              Detroit and 70 Dark Carnival cards; this recovered set contains
+              101 and 69, with unresolved duplicates. This is not an official or
+              perfect replica.
             </p>
             <button
               className="quiet wide"
@@ -1521,19 +1635,31 @@ export default function Home() {
           <p>
             Character starting stats and equipment, movement paths and tolls,
             ordinary combat, natural 1/10 results, weapon breakage, basic shops,
-            trade consent, the first-death replacement character, and the ten
-            ending structures. Check conditional Items, Homies, Bones and powers
+            trade consent, first-death replacement, Casket resurrection,
+            Psychopathic Ring replacement before an ending resolves, nearby
+            borrowed powers, Crystal Ball inspection, Bone conditions and the
+            ten ending structures. Check conditional Items, Homies and powers
             before rolling: use the combat modifier and table controls where
             needed.
+          </p>
+          <h3>Timing at this table</h3>
+          <p>
+            Timed Bones apply immediately and count future full turns of their
+            holder. Skitsofrantic uses the next seat in the lobby order, even if
+            turn direction reverses. King High Bone lasts ten real minutes,
+            including time disconnected. Amputation limits capacity to three
+            even with Backpack; Concussion clears on an unmodified movement
+            total of six. These resolve details the source cards leave unclear.
           </p>
           <h3>Source limitations</h3>
           <p>
             The recovered community inventory contains 101 Detroit, 90
             Nethervoid and 69 Dark Carnival cards, 13 Bones, and 40 Purchase
-            Items. A Detroit atlas repeats 19 card faces. Three titles are
-            unclear. These counts are preserved as evidence, not certified
-            physical-edition counts. Board photography has glare and cropping.
-            Card artwork is not reproduced here.
+            Items. The printed rulebook lists 110 Detroit, 90 Nethervoid, 70
+            Dark Carnival and 42 Purchase cards. A Detroit atlas repeats 19 card
+            faces; three titles are unclear. The missing cards and copy counts
+            remain unresolved. Board photography has glare and cropping. Card
+            artwork is not reproduced here.
           </p>
           <ul>
             <li>

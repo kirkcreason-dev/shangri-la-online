@@ -1,20 +1,37 @@
-# Component research — September 28, 2026
+# Component research — September 29, 2026
 
-Further research recovered a complete board photograph and all 18 character references from a publicly available Tabletop Simulator mod. These discoveries supersede the earlier research-only notes.
+The scanned printed rulebook and a community Tabletop Simulator inventory are the evidence behind this assisted edition. Their card totals disagree; the app is not a complete retail replica.
 
 ## Sources
 
-- [Scanned 12-page rulebook](https://drive.google.com/file/d/1B5uLPQUczukkIaobj1eUxzcDutSJ-1Ml/view).
+- [Scanned 12-page rulebook](https://drive.google.com/file/d/1B5uLPQUczukkIaobj1eUxzcDutSJ-1Ml/view), especially the contents on page 1, setup and maximum Combat Bonus on page 2, and ending explanations on pages 8–9.
 - [Community Tabletop Simulator mod](https://steamcommunity.com/sharedfiles/filedetails/?id=3079987608).
 - [Public mod data](https://cdn.steamusercontent.com/ugc/2208514167419734330/45F0ED0C677AEA69B021A1117CCABA7CA799F8B5/).
-- [Board photograph used as the visual reference](https://cdn.steamusercontent.com/ugc/2208514167401741381/685D77C4EC146B157FB5180623B94D921B0A1B36/).
-- [BoardGameGeek gallery](https://boardgamegeek.com/boardgame/28879/the-quest-for-shangri-la/images).
-- [Additional component gallery](https://riddlebox.be/homepage/games/quest_for_shangri_la/2007_quest_for_shangri_la_home.htm).
+- [Board photograph](https://cdn.steamusercontent.com/ugc/2208514167401741381/685D77C4EC146B157FB5180623B94D921B0A1B36/).
+- Every component in `lib/rules/cards.json` links to its source photograph. Character and space records are in `lib/rules/characters.json` and `lib/rules/spaces.json`.
 
-The public mod contains 101 Detroit, 90 Nethervoid, 69 Dark Carnival, 13 Bones, 42 Purchase, and 8 ending objects. These are object counts, not verified unique-card counts. Two of the ten reported endings remain unaccounted for. A full identity and duplicate audit has not been completed. Asset availability was checked: 115 of 116 referenced image URLs were reachable; the failure was an old decorative table asset.
+## Inventory discrepancy
 
-The board contains 28 Detroit, 20 Nethervoid, and 12 Dark Carnival spaces. The photograph is 2699×2702 pixels, with glare and minor edge cropping. The outer space labelled The Pit has less certain legibility than the other mapped names. The map and source URL can be revised independently of the engine.
+| Deck | Printed contents, page 1 | Recovered playable records |
+| --- | ---: | ---: |
+| Detroit | 110 | 101 |
+| Nethervoid | 90 | 90 |
+| Dark Carnival | 70 | 69 |
+| Purchase | 42 | 40 |
+| Bones | 13 | 13 |
 
-All 18 character references were located. The card photograph identifies **Mack Benjamin**; some secondary lists incorrectly say Hack Benjamin. `character-reference.json` records factual setup data and image-source links. These facts are research, not a claim that all powers or interactions have been implemented.
+These are counts of physical objects, not unique titles. The Detroit inventory repeats a 19-card atlas; determining which repeated faces belong in a retail set requires a complete physical inventory. The Purchase stack contains two Cash objects excluded from the 40 playable Item cards. The matching Nethervoid total alone does not prove identity or copy-count fidelity. Missing identities must not be invented to pad the decks.
 
-No publisher authorization or reusable asset license was found. The app identifies itself as unofficial and uses original encounter writing, equal starting stats, and disclosed adaptation rules. It does not claim completeness or verbatim fidelity.
+Three Detroit title readings remain provisional: the Homie at source card 3300 and the two challenge cards 7910/8010. The card records retain their source notes. The rulebook describes all ten endings, although the recovered mod has eight ending objects. The ten implemented structures use the rulebook explanations.
+
+The character photograph reads Mack Benjamin, while the rulebook contents list Hack Benjamin. The game retains the photographed record name. This is a source disagreement, not simply a mistaken secondary listing.
+
+All 60 board spaces (28 Detroit, 20 Nethervoid, 12 Dark Carnival) and all 18 character records have been mapped. The board photograph has glare and edge cropping. Card artwork is not reproduced. Mechanical summaries are newly worded; no official endorsement is claimed.
+
+## Implemented timing conventions
+
+Rules edition 3 integrates Casket before ordinary death or inheritance, defers newly revealed endings for a Psychopathic Ring decision, recalculates printed borrowed powers by current positions, and persists Bone durations and delegated control. King High Bone uses a server timestamp ten real minutes after the draw, including disconnect time. Crystal Ball peeks are visible only to the controlling seat.
+
+The sources do not resolve every interaction. This table counts timed Bones over future full turns after applying them immediately, uses stable lobby order for the left-hand seat, gives Amputation's three-Item cap precedence over Backpack, and cures Concussion on an unmodified movement total of six. Borrowed powers are printed powers, not recursively borrowed copies. These conventions are shown in the game; they are not presented as verified publisher rulings.
+
+178 component records still require some table adjudication, including conditional Action cards and exceptional Item/Homie effects. Logged controls support cooperative play but are not a complete rules engine. Full release requires the missing inventory, remaining effects, and real multi-person acceptance playtesting.

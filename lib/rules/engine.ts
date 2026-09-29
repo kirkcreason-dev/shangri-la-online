@@ -1,4 +1,15 @@
 import {
+  absent,
+  boneId,
+  hasBone,
+  capacity,
+  protectedItem,
+  movementPenalty,
+  controllerFor,
+  canControl,
+  conditionSummary,
+} from "./conditions.ts";
+import {
   CARDS,
   CHARACTERS,
   COLORS,
@@ -115,7 +126,7 @@ export function makeRoom(
   const p = newPlayer(session, name, char, 0),
     endings = shuffle(ENDINGS.map((e) => e.id));
   return {
-    rulesVersion: 2,
+    rulesVersion: 3,
     code,
     status: "lobby",
     host: p.id,
@@ -203,6 +214,7 @@ function removeCard(s: State, p: Player, id: string) {
   for (const list of [p.items, p.homies, p.bones]) {
     const i = list.indexOf(id);
     if (i >= 0) {
+      if (p.conditions) delete p.conditions[id];
       list.splice(i, 1);
       discard(s, id);
       return;
@@ -213,13 +225,10 @@ function removeCard(s: State, p: Player, id: string) {
 function loseAll(s: State, p: Player, what: "items" | "homies" | "bones") {
   for (const id of p[what]) discard(s, id);
   p[what] = [];
+  if (what === "bones") p.conditions = {};
 }
 function overflow(s: State, p: Player) {
-  if (
-    p.items.length >
-      (p.items.some((id) => cardName(id) === "Backpack") ? 9 : 6) &&
-    !s.overflow
-  ) {
+  if (p.items.length > capacity(p) && !s.overflow) {
     s.overflow = { player: p.id, returnPhase: s.phase };
     s.phase = "overflow";
   }
@@ -227,11 +236,37 @@ function overflow(s: State, p: Player) {
 function heal(p: Player, n: number) {
   p.life = Math.min(p.maxLife, p.life + n);
 }
-function cb(p: Player, n: number) {
-  p.bonus = Math.max(0, p.bonus + n);
+function gainCash(p: Player, n: number) {
+  if (!hasBone(p, "Karmageddon")) p.cash += n;
 }
-function death(s: State, p: Player, permanent = false) {
-  if (p.dead) return;
+function receive(s: State, p: Player, id: string, homie = false) {
+  if (hasBone(p, "Karmageddon")) {
+    discard(s, id);
+    addLog(s, `${p.name} cannot keep ${cardName(id)} because of Karmageddon.`);
+    return;
+  }
+  p[homie ? "homies" : "items"].push(id);
+}
+function cb(p: Player, n: number) {
+  p.bonus = Math.max(0, Math.min(25, p.bonus + n));
+}
+function death(s: State, p: Player, permanent = false, mortal = false) {
+  if (p.dead || p.respawn || absent(p)) return;
+  const casket = p.items.find((id) => cardName(id) === "Casket");
+  if (casket && !mortal) {
+    // The Casket changes death before ordinary elimination/inheritance destroys the old record.
+    p.life = 1;
+    p.respawn = true;
+    p.respawnAt = findSpace("Knapp Cemetery");
+    p.casketRecovery = casket;
+    p.skip = 0;
+    p.boost = 0;
+    addLog(
+      s,
+      `${p.name} will return through Casket at Knapp Cemetery next turn with 1 Life and their possessions.`,
+    );
+    return;
+  }
   const previous = p.character;
   s.usedCharacters.push(previous);
   if (!p.rebirth && !s.finalEntered && !permanent) {
@@ -288,7 +323,7 @@ function damage(
   mortal = false,
   permanent = false,
 ) {
-  if (p.dead) return;
+  if (p.dead || p.respawn || absent(p)) return;
   p.life = Math.max(0, p.life - n);
   if (p.life > 0) return;
   if (!mortal && !permanent && has(s, p, "survive_last_life")) {
@@ -299,7 +334,7 @@ function damage(
       return;
     }
   }
-  death(s, p, permanent);
+  death(s, p, permanent || mortal, mortal);
 }
 function combatDamage(
   s: State,
@@ -333,24 +368,118 @@ function drawId(s: State, region: number | "bone") {
   need(s.decks[region].length, "No cards are available in this region.");
   return s.decks[region].pop()!;
 }
-function drawBone(s: State, p: Player) {
-  if (
-    has(s, p, "ignore_bones") ||
-    p.homies.some((id) => cardName(id) === "Noosawaa")
-  ) {
-    addLog(s, `${p.name} is immune to Bone cards.`);
+function nonCombatDie(p: Player, sides = 6) {
+  return dice(sides) - (hasBone(p, "Random Bone Generator") ? 1 : 0);
+}
+function cureOnArrival(s: State, p: Player) {
+  const name = spaceName(p.region, p.pos),
+    start = character(p.character).startingSpace;
+  const cures: Record<string, string> = {
+    Karmageddon: "Oz",
+    "Random Bone Generator": "Chaos District",
+    "Slippery Palms": "Playaz Strip Club",
+    Amnesia: start,
+  };
+  for (const [bone, location] of Object.entries(cures)) {
+    const id = boneId(p, bone);
+    if (id && name === location) {
+      removeCard(s, p, id);
+      addLog(s, `${p.name} recovered from ${bone}.`);
+    }
+  }
+}
+function expireTurnConditions(s: State, p: Player) {
+  for (const [id, c] of Object.entries(p.conditions ?? {})) {
+    if (
+      c.expiresAfterTurn !== undefined &&
+      (s.turnsTaken[p.id] ?? 0) >= c.expiresAfterTurn &&
+      [...p.bones, ...p.items].includes(id)
+    ) {
+      removeCard(s, p, id);
+      addLog(s, `${p.name}'s ${cardName(id)} expired.`);
+    }
+  }
+}
+export function tick(s: State, now = Date.now()) {
+  if (s.rulesVersion !== 3 || s.status !== "playing") return false;
+  let changed = false;
+  for (const p of s.players) {
+    if (p.absentUntil && p.absentUntil <= now) {
+      delete p.absentUntil;
+      changed = true;
+      addLog(
+        s,
+        `${p.name} returned after King High Bone. No arrival encounter is triggered.`,
+      );
+    }
+  }
+  if (changed && s.phase === "waiting") {
+    const i = s.players.findIndex((p) => !p.dead && !absent(p, now));
+    if (i >= 0) {
+      s.turn = i;
+      startTurn(s);
+    }
+  }
+  return changed;
+}
+function drawBone(s: State, p: Player, bypassSkateboard = false) {
+  if (has(s, p, "ignore_bones") || held(p, "Noosawaa")) {
+    addLog(s, `${p.name} is immune to Bone draws.`);
     return;
   }
-  const id = drawId(s, "bone");
-  p.bones.push(id);
-  addLog(s, `${p.name} drew ${cardName(id)}.`);
-  ruling(
-    s,
-    p,
-    [id],
-    "Apply this Bone card. Persistent effects stay with the player.",
-    true,
-  );
+  if (!bypassSkateboard && held(p, "Skateboard")) {
+    s.decision = { kind: "bone-draw", actor: p.id, returnPhase: s.phase };
+    s.phase = "decision";
+    return;
+  }
+  const id = drawId(s, "bone"),
+    name = cardName(id);
+  p.conditions ??= {};
+  if (name === "Random Bone Generator") {
+    receive(s, p, id);
+    if (!p.items.includes(id)) return;
+    overflow(s, p);
+  } else p.bones.push(id);
+  addLog(s, `${p.name} drew ${name}.`);
+  if (["Panic Attack", "Insanity", "Skitsofrantic"].includes(name)) {
+    p.conditions[id] = {
+      expiresAfterTurn:
+        (s.turnsTaken[p.id] ?? 0) + (name === "Skitsofrantic" ? 2 : 3),
+    };
+    if (name === "Skitsofrantic")
+      p.conditions[id].controller =
+        s.players[(s.players.indexOf(p) + 1) % s.players.length].id;
+  } else if (name === "Amputation") {
+    const r = nonCombatDie(p);
+    s.lastDice = [r];
+    p.conditions[id] = { branch: r <= 3 ? "arm" : "leg" };
+    addLog(
+      s,
+      `${p.name}'s Amputation roll ${r}: ${r <= 3 ? "Item capacity 3" : "movement −2"}.`,
+    );
+    overflow(s, p);
+  } else if (name === "The Runs") {
+    removeCard(s, p, id);
+    loseTurn(s, p);
+  } else if (name === "King High Bone") {
+    removeCard(s, p, id);
+    p.absentUntil = Date.now() + 600000;
+    addLog(
+      s,
+      `${p.name} is absent until ${new Date(p.absentUntil).toISOString()}.`,
+    );
+    if (s.trade && [s.trade.from, s.trade.to].includes(p.id)) s.trade = null;
+    if (s.ruling?.actor === p.id) s.ruling = null;
+    if (p.id === current(s).id) {
+      s.phase = "end";
+      s.encounter = null;
+      s.queue = [];
+    }
+  } else if (name === "Transfer the Bone") {
+    removeCard(s, p, id);
+    s.decision = { kind: "bone-transfer", actor: p.id, returnPhase: s.phase };
+    s.phase = "decision";
+  }
 }
 function ruling(
   s: State,
@@ -402,7 +531,9 @@ export function destinations(
     const n = COUNTS[r],
       edges = [
         { r, pos: (pos + 1) % n, cost: 0 },
-        { r, pos: (pos + n - 1) % n, cost: 0 },
+        ...(!hasBone(p, "Concussion")
+          ? [{ r, pos: (pos + n - 1) % n, cost: 0 }]
+          : []),
       ];
     const free = s
       ? has(s, p, "waive_region_tolls")
@@ -430,7 +561,10 @@ export function destinations(
       if (
         !seen.has(key) &&
         toll + e.cost <= p.cash &&
-        (!item || p.items.some((id) => !id.startsWith("ending-")))
+        (!item ||
+          p.items.some(
+            (id) => !id.startsWith("ending-") && !protectedItem(p, id),
+          ))
       )
         visit(
           e.r,
@@ -643,6 +777,19 @@ function rollCombat(s: State) {
     has(s, p, "defeat_police")
   )
     diff = 1;
+  if (q && (hasBone(p, "Insanity") || hasBone(q, "Insanity")))
+    diff =
+      hasBone(p, "Insanity") && hasBone(q, "Insanity")
+        ? 0
+        : hasBone(p, "Insanity")
+          ? -1
+          : 1;
+  if (
+    !f.mortal &&
+    ((diff > 0 && hasBone(p, "Panic Attack")) ||
+      (diff < 0 && q && hasBone(q, "Panic Attack")))
+  )
+    diff = 0;
   if ((a.escape && diff > 0) || (b?.escape && diff < 0)) diff = 0;
   for (const [player, choice, raw] of [
     [p, a, r],
@@ -777,6 +924,10 @@ function enterEnding(s: State, p: Player) {
       s,
       `${p.name} revealed ${ENDINGS.find((e) => e.id === s.ending)?.name}.`,
     );
+    if (held(p, "Psychopathic Ring") && s.endingPool.length) {
+      s.endingPending = p.id;
+      return;
+    }
   }
   if (s.ending === "unveiling") {
     win(s, [p.id]);
@@ -784,6 +935,7 @@ function enterEnding(s: State, p: Player) {
   }
   if (s.ending === "dimension") {
     death(s, p, true);
+    (s.endingDiscard ??= []).push(s.ending);
     s.ending = shuffle(s.endingPool).pop()!;
     need(s.ending, "No endings remain.");
     s.finalRevealed = false;
@@ -793,8 +945,22 @@ function enterEnding(s: State, p: Player) {
   }
   if (s.ending === "outer-space") {
     for (let n = 0; n < 3; n++) {
-      const living = s.players.filter((p) => !p.dead);
+      const living = s.players.filter(
+        (p) => !p.dead && !p.respawn && !absent(p),
+      );
       const rolls = living.map((p) => ({ p, r: dice() }));
+      for (const roll of rolls)
+        if (hasBone(roll.p, "Random Bone Generator")) roll.r--;
+      if (rolls.some(({ r }) => r === 0)) {
+        ruling(
+          s,
+          p,
+          [],
+          `Bombardment round ${n + 1} has an undefined modified zero: ${rolls.map(({ p, r }) => `${p.name} ${r}`).join(", ")}. Resolve this round and remaining rounds with the table, then declare the surviving winner(s).`,
+        );
+        s.ruling!.returnPhase = "ending";
+        return;
+      }
       for (const { p, r } of rolls) {
         addLog(s, `${p.name} rolled ${r} against the bombardment.`);
         if (r <= 2) death(s, p, true);
@@ -855,7 +1021,7 @@ function endingTurn(s: State, p: Player) {
     else s.phase = "end";
   } else if (s.ending === "wraith") {
     const count = s.endingProgress[p.id] ?? 0,
-      r = dice();
+      r = nonCombatDie(p);
     s.lastDice = [r];
     addLog(s, `${p.name} rolled ${r}+${count} against The Wraith.`);
     if (r + count >= 6) win(s, [p.id]);
@@ -868,6 +1034,7 @@ function endingTurn(s: State, p: Player) {
   } else s.phase = "ending";
 }
 function arrive(s: State, p: Player) {
+  cureOnArrival(s, p);
   if (p.region === 3) {
     enterEnding(s, p);
     return;
@@ -908,9 +1075,17 @@ function startTurn(s: State) {
   s.queue = [];
   s.locationDone = false;
   s.wonFiend = false;
+  s.peek = null;
   s.turnsTaken[p.id] = (s.turnsTaken[p.id] ?? 0) + 1;
   if (p.respawn) {
-    Object.assign(p, findSpace(character(p.character).startingSpace));
+    Object.assign(
+      p,
+      p.respawnAt ?? findSpace(character(p.character).startingSpace),
+    );
+    if (p.casketRecovery && p.items.includes(p.casketRecovery))
+      removeCard(s, p, p.casketRecovery);
+    delete p.casketRecovery;
+    delete p.respawnAt;
     p.respawn = false;
     const allowed = (id: string) =>
       !card(id).allegiance || card(id).allegiance === p.allegiance;
@@ -935,17 +1110,24 @@ function startTurn(s: State) {
 }
 function nextTurn(s: State) {
   const p = current(s);
-  if (p.extraTurns > 0 && !p.dead) {
+  expireTurnConditions(s, p);
+  if (p.extraTurns > 0 && !p.dead && !absent(p)) {
     p.extraTurns--;
     startTurn(s);
     return;
   }
   let attempts = 0;
+  const maxAttempts =
+    s.players.reduce((n, q) => n + q.skip, 0) + s.players.length + 1;
   do {
     s.turn =
       (s.turn + (s.direction ?? 1) + s.players.length) % s.players.length;
     if (s.turn === 0) s.round++;
     const q = current(s);
+    if (absent(q)) {
+      attempts++;
+      continue;
+    }
     if (!q.dead && q.skip > 0) {
       q.skip--;
       addLog(s, `${q.name} misses this turn.`);
@@ -954,11 +1136,15 @@ function nextTurn(s: State) {
       return;
     }
     attempts++;
-  } while (attempts < 50);
-  throw new Error("No playable turn is available.");
+  } while (attempts < maxAttempts);
+  s.phase = "waiting";
+  s.choices = [];
+  addLog(s, "The table is waiting for a timed absence to finish.");
 }
 function playerById(s: State, id?: string) {
-  const p = s.players.find((p) => p.id === id && !p.dead);
+  const p = s.players.find(
+    (p) => p.id === id && !p.dead && !absent(p) && !p.respawn,
+  );
   need(p, "Choose a living player.");
   return p!;
 }
@@ -981,7 +1167,7 @@ function transfer(
     "That allegiance cannot keep this card.",
   );
   from[key] = from[key].filter((x) => x !== id);
-  to[key].push(id);
+  receive(s, to, id, homie);
   if (id.startsWith("ending-")) s.endingHolder = to.id;
   overflow(s, to);
 }
@@ -1080,7 +1266,8 @@ function boardEffects(s: State, p: Player, effects: any[], bonus = 0) {
         heal(p, e.amount);
         break;
       case "cash_change":
-        if (!held(p, "Karmageddon")) p.cash += e.amount;
+        if (e.amount > 0) gainCash(p, e.amount);
+        else p.cash = Math.max(0, p.cash + e.amount);
         break;
       case "combat_bonus_change":
         cb(p, e.amount);
@@ -1101,13 +1288,20 @@ function boardEffects(s: State, p: Player, effects: any[], bonus = 0) {
         );
         break;
       case "roll_table": {
-        const r = dice() + bonus;
+        const r = nonCombatDie(p) + bonus;
         s.lastDice = [r];
         addLog(s, `${spaceName(p.region, p.pos)}: ${p.name} rolled ${r}.`);
         const row = e.outcomes.find((x: any) =>
           x.rolls.includes(Math.min(6, r)),
         );
         if (row) boardEffects(s, p, row.effects);
+        else
+          ruling(
+            s,
+            p,
+            [],
+            `The modified roll ${r} has no printed result at ${spaceName(p.region, p.pos)}. Agree on this undefined result before continuing.`,
+          );
         break;
       }
       case "relocate":
@@ -1281,7 +1475,7 @@ function powerAction(s: State, p: Player, a: Action) {
       );
       costHomies(2);
       s.discards = s.discards.map((d) => d.filter((id) => id !== a.item));
-      p.homies.push(a.item!);
+      receive(s, p, a.item!, true);
       break;
     case "steal_homie":
     case "steal_item":
@@ -1303,7 +1497,9 @@ function powerAction(s: State, p: Player, a: Action) {
           "Use a table ruling for Homies whose gender is not verified.",
         );
       {
-        const r = ["steal_item", "steal_homie"].includes(key) ? dice(10) : 10;
+        const r = ["steal_item", "steal_homie"].includes(key)
+          ? nonCombatDie(p, 10)
+          : 10;
         addLog(s, `${p.name}: ${key.replaceAll("_", " ")} ${r}.`);
         if (r >= 8)
           transfer(
@@ -1324,7 +1520,7 @@ function powerAction(s: State, p: Player, a: Action) {
       {
         const n = Math.min(100, q!.cash);
         q!.cash -= n;
-        p.cash += n;
+        gainCash(p, n);
         p.used.push(key);
       }
       break;
@@ -1381,7 +1577,7 @@ function powerAction(s: State, p: Player, a: Action) {
     case "fiend_victory_extra_turn":
       need(s.wonFiend, "Defeat a Fiend first.");
       {
-        const r = dice(10);
+        const r = nonCombatDie(p, 10);
         s.lastDice = [r];
         if (r >= 6) p.extraTurns++;
         p.used.push(key);
@@ -1392,9 +1588,9 @@ function powerAction(s: State, p: Player, a: Action) {
       need(a.item && p.homies.includes(a.item), "Choose a Homie.");
       removeCard(s, p, a.item!);
       {
-        const r = dice();
+        const r = nonCombatDie(p);
         s.lastDice = [r];
-        p.cash += Math.ceil(r / 2) * 100;
+        gainCash(p, Math.ceil(r / 2) * 100);
       }
       break;
     case "redirect_next_turn_loot":
@@ -1403,7 +1599,7 @@ function powerAction(s: State, p: Player, a: Action) {
         "Choose another player sharing your space.",
       );
       {
-        const r = dice(10);
+        const r = nonCombatDie(p, 10);
         s.lastDice = [r];
         if (r >= 6) {
           q!.lootFor = p.id;
@@ -1461,9 +1657,12 @@ function applyRuling(s: State, actor: Player, a: Action) {
       else heal(p, n);
       break;
     }
-    case "cash":
-      p.cash = Math.max(0, p.cash + integer(a.amount, -1000000, 1000000));
+    case "cash": {
+      const amount = integer(a.amount, -1000000, 1000000);
+      if (amount > 0) gainCash(p, amount);
+      else p.cash = Math.max(0, p.cash + amount);
       break;
+    }
     case "bonus":
       cb(p, integer(a.amount, -100, 100));
       break;
@@ -1497,9 +1696,7 @@ function applyRuling(s: State, actor: Player, a: Action) {
     }
     case "draw":
       if (a.deck === "bone") {
-        const id = drawId(s, "bone");
-        p.bones.push(id);
-        addLog(s, `${p.name} drew ${cardName(id)}: ${card(id).rules}`);
+        drawBone(s, p);
       } else {
         const region = integer(a.deck, 0, 2),
           id = drawId(s, region);
@@ -1518,22 +1715,32 @@ function applyRuling(s: State, actor: Player, a: Action) {
       );
       s.discards = s.discards.map((d) => d.filter((x) => x !== id));
       s.purchase = s.purchase.filter((x) => x !== id);
-      if (card(id).kind === "homie") p.homies.push(id);
+      if (card(id).kind === "homie") receive(s, p, id, true);
       else {
         need(
           card(id).kind === "item",
           "Only Items or Homies may be retrieved.",
         );
-        p.items.push(id);
+        receive(s, p, id);
       }
       break;
     }
     case "eliminate":
       death(s, p, true);
       break;
-    case "win":
-      win(s, [p.id]);
+    case "win": {
+      const winners = a.winners ?? [p.id];
+      need(
+        Array.isArray(winners) &&
+          winners.length > 0 &&
+          winners.length <= s.players.length &&
+          new Set(winners).size === winners.length &&
+          winners.every((id) => s.players.some((q) => q.id === id && !q.dead)),
+        "Choose living winners.",
+      );
+      win(s, winners);
       break;
+    }
     case "reverse":
       s.direction = s.direction === -1 ? 1 : -1;
       break;
@@ -1549,19 +1756,26 @@ function applyRuling(s: State, actor: Player, a: Action) {
 }
 export function applyAction(s: State, actorId: string, a: Action) {
   need(
-    s.rulesVersion === 2,
+    s.rulesVersion === 3,
     "This saved prototype uses the old rules. Create a new corrected table.",
   );
-  let p = s.players.find((p) => p.id === actorId);
-  need(p, "Join the table first.");
-  if (a.actor && a.actor !== actorId) {
+  tick(s);
+  const authenticated = s.players.find((p) => p.id === actorId);
+  need(authenticated, "Join the table first.");
+  let p = s.players.find((p) => p.id === (a.actor ?? actorId))!;
+  need(p, "Choose your controlled seat.");
+  if (s.status === "lobby")
+    need(p.id === actorId, "Lobby choices belong to your own seat.");
+  else
     need(
-      p!.id === s.host && s.players.some((q) => q.id === a.actor && q.bot),
-      "Only the host may make a practice opponent’s choices.",
+      canControl(s, actorId, p),
+      "This seat is controlled by another player.",
     );
-    p = s.players.find((q) => q.id === a.actor);
-  }
-  p = p!;
+  need(
+    (a.type === "end" && p.id === current(s).id) ||
+      (!absent(authenticated!) && !absent(p)),
+    "King High Bone prevents participation until its ten-minute timer ends.",
+  );
   if (s.status === "lobby") {
     switch (a.type) {
       case "ready":
@@ -1643,6 +1857,57 @@ export function applyAction(s: State, actorId: string, a: Action) {
     }
   }
   need(s.status === "playing", "This game has finished.");
+  if (a.type === "wake") {
+    tick(s);
+    return;
+  }
+  if (s.endingPending) {
+    need(
+      s.endingPending === p.id &&
+        ["ending-accept", "ending-replace"].includes(a.type),
+      "Resolve the newly revealed ending before other actions.",
+    );
+    if (a.type === "ending-replace") {
+      const ring = p.items.find((id) => cardName(id) === "Psychopathic Ring");
+      need(ring && s.endingPool.length, "No replacement is available.");
+      removeCard(s, p, ring!);
+      (s.endingDiscard ??= []).push(s.ending);
+      s.ending = shuffle(s.endingPool).pop()!;
+      s.endingProgress = {};
+      addLog(
+        s,
+        `${p.name} used Psychopathic Ring. The replacement is ${ENDINGS.find((e) => e.id === s.ending)?.name}; it must be accepted.`,
+      );
+    }
+    s.endingPending = null;
+    enterEnding(s, p);
+    endCheck(s);
+    return;
+  }
+  if (s.decision) {
+    const d = s.decision;
+    need(
+      d.actor === p.id && a.type === "bone-decision",
+      "Finish the pending Bone choice first.",
+    );
+    s.decision = null;
+    s.phase = d.returnPhase;
+    if (d.kind === "bone-draw") {
+      if (a.choice === "skateboard") {
+        need(held(p, "Skateboard"), "The Skateboard is no longer available.");
+        const r = nonCombatDie(p, 10);
+        s.lastDice = [r];
+        addLog(s, `${p.name} rolled ${r} with Skateboard.`);
+        if (r >= 4) return;
+      } else need(a.choice === "draw", "Choose whether to use Skateboard.");
+      drawBone(s, p, true);
+    } else {
+      const q = playerById(s, a.target);
+      need(q.id !== p.id, "Choose another player.");
+      drawBone(s, q);
+    }
+    return;
+  }
   if (a.type === "combat-choice") {
     combatChoice(s, p, a);
     return;
@@ -1667,7 +1932,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
       case "cash": {
         const n = Math.min(300, q.cash);
         q.cash -= n;
-        p.cash += n;
+        gainCash(p, n);
         break;
       }
       case "item":
@@ -1701,10 +1966,20 @@ export function applyAction(s: State, actorId: string, a: Action) {
         q.cash >= t.giveCash && p.cash >= t.askCash,
         "The offered Cash is no longer available.",
       );
+      need(
+        !t.give || !protectedItem(q, t.give),
+        "The offered Item cannot leave its holder.",
+      );
+      need(
+        !t.ask || !protectedItem(p, t.ask),
+        "The requested Item cannot leave its holder.",
+      );
       if (t.give) transfer(s, q, p, t.give);
       if (t.ask) transfer(s, p, q, t.ask);
-      q.cash += t.askCash - t.giveCash;
-      p.cash += t.giveCash - t.askCash;
+      q.cash -= t.giveCash;
+      p.cash -= t.askCash;
+      gainCash(q, t.askCash);
+      gainCash(p, t.giveCash);
       addLog(s, `${p.name} accepted ${q.name}'s trade.`);
     }
     s.trade = null;
@@ -1756,8 +2031,13 @@ export function applyAction(s: State, actorId: string, a: Action) {
       s.ruling = null;
       s.phase = r.returnPhase;
       if (s.phase === "ruling") s.phase = "end";
+      if ((q.dead || q.respawn) && q.id === current(s).id) {
+        s.phase = "end";
+        s.combat = null;
+      }
       if (
         !q.dead &&
+        !q.respawn &&
         q.region === 3 &&
         s.phase !== "combat" &&
         s.phase !== "ending"
@@ -1771,9 +2051,13 @@ export function applyAction(s: State, actorId: string, a: Action) {
   if (a.type === "overflow-discard") {
     need(s.overflow?.player === p.id, "No inventory choice is awaiting you.");
     need(a.item && p.items.includes(a.item), "Choose an Item.");
+    need(
+      !protectedItem(p, a.item!),
+      "That Item cannot be voluntarily discarded.",
+    );
     removeCard(s, p, a.item!);
-    const capacity = held(p, "Backpack") ? 9 : 6;
-    if (p.items.length <= capacity) {
+    const limit = capacity(p);
+    if (p.items.length <= limit) {
       s.phase = s.overflow!.returnPhase;
       s.overflow = null;
       for (const q of s.players) if (!q.dead) overflow(s, q);
@@ -1795,6 +2079,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
         [...p.items, ...p.homies, ...p.bones].includes(a.item),
         "You do not hold that card.",
       );
+    need(!s.combat.choices[p.id], "Your combat choice is locked.");
     beginRuling(s, p, a.item ? [a.item] : [], a.reason!.slice(0, 300));
     return;
   }
@@ -1808,6 +2093,42 @@ export function applyAction(s: State, actorId: string, a: Action) {
     "Finish the pending choice first.",
   );
   switch (a.type) {
+    case "cure-bone": {
+      need(
+        p.region === 0 && p.pos === 25 && s.phase === "end" && s.locationDone,
+        "Visit the Hospital first.",
+      );
+      need(
+        a.item &&
+          p.bones.includes(a.item) &&
+          ["Crabs", "Amputation"].includes(cardName(a.item)),
+        "Choose a treatable condition.",
+      );
+      pay(p, cardName(a.item!) === "Crabs" ? 100 : 300);
+      removeCard(s, p, a.item!);
+      break;
+    }
+    case "peek": {
+      need(
+        s.phase === "roll" &&
+          held(p, "Crystal Ball") &&
+          !p.used.includes("crystal-ball"),
+        "Use Crystal Ball once at the start of your turn.",
+      );
+      const region = integer(a.region, 0, 2);
+      if (!s.decks[region].length) {
+        s.decks[region] = shuffle(s.discards[region]);
+        s.discards[region] = [];
+      }
+      need(s.decks[region].length, "That deck has no cards.");
+      s.peek = { player: p.id, card: s.decks[region].at(-1)! };
+      p.used.push("crystal-ball");
+      addLog(
+        s,
+        `${p.name} privately inspected the ${["Detroit", "Nethervoid", "Dark Carnival"][region]} deck.`,
+      );
+      break;
+    }
     case "roll":
       need(s.phase === "roll", "Roll once at the beginning of your turn.");
       if (
@@ -1825,7 +2146,12 @@ export function applyAction(s: State, actorId: string, a: Action) {
         );
         const rolls = two ? [dice(), dice()] : [dice()];
         s.lastDice = rolls;
-        s.roll = rolls.reduce((x, y) => x + y, 0);
+        const raw = rolls.reduce((x, y) => x + y, 0);
+        if (raw === 6) {
+          const concussion = boneId(p, "Concussion");
+          if (concussion) removeCard(s, p, concussion);
+        }
+        s.roll = Math.max(1, raw - movementPenalty(p));
         s.choices = destinations(p, s.roll, s);
         if (!two && s.roll === 6) {
           if (has(s, p, "movement_six_teleport"))
@@ -1868,7 +2194,10 @@ export function applyAction(s: State, actorId: string, a: Action) {
         need(d, "Choose a highlighted destination.");
         if (d!.itemToll) {
           need(
-            a.item && p.items.includes(a.item) && !a.item.startsWith("ending-"),
+            a.item &&
+              p.items.includes(a.item) &&
+              !a.item.startsWith("ending-") &&
+              !protectedItem(p, a.item),
             "Choose one Item to discard at the Portal.",
           );
           removeCard(s, p, a.item!);
@@ -1981,11 +2310,11 @@ export function applyAction(s: State, actorId: string, a: Action) {
           "Trade with a player sharing your space.",
         );
         need(
-          !a.give || p.items.includes(a.give),
+          !a.give || (p.items.includes(a.give) && !protectedItem(p, a.give)),
           "You do not hold the offered Item.",
         );
         need(
-          !a.ask || q.items.includes(a.ask),
+          !a.ask || (q.items.includes(a.ask) && !protectedItem(q, a.ask)),
           "The requested Item is unavailable.",
         );
         const giveCash = integer(a.giveCash ?? 0, 0, p.cash),
@@ -2034,7 +2363,7 @@ export function applyAction(s: State, actorId: string, a: Action) {
           price -= 100;
         pay(p, price);
         s.purchase = s.purchase.filter((x) => x !== id);
-        p.items.push(id);
+        receive(s, p, id);
         overflow(s, p);
         addLog(s, `${p.name} bought ${c.name} for $${price}.`);
       }
@@ -2045,17 +2374,22 @@ export function applyAction(s: State, actorId: string, a: Action) {
         "Resolve a shop space first.",
       );
       need(
-        a.item && p.items.includes(a.item) && !a.item.startsWith("ending-"),
+        a.item &&
+          p.items.includes(a.item) &&
+          !a.item.startsWith("ending-") &&
+          !protectedItem(p, a.item),
         "Choose an Item to sell.",
       );
       {
         const name = cardName(a.item!);
-        p.cash +=
+        gainCash(
+          p,
           p.region === 0 && name === "Chrome Spinner Rims"
             ? 400
             : p.region === 0 && name === "Car Radios"
               ? 300
-              : 100;
+              : 100,
+        );
         removeCard(s, p, a.item!);
       }
       break;
@@ -2081,9 +2415,10 @@ export function applyAction(s: State, actorId: string, a: Action) {
       );
       {
         const n = integer(a.amount, 0, p.cash),
-          r = dice();
+          r = nonCombatDie(p);
         s.lastDice = [r];
-        p.cash += (r <= 2 ? -1 : r >= 5 ? 1 : 0) * n;
+        if (r <= 2) p.cash -= n;
+        else if (r >= 5) gainCash(p, n);
         p.used.push("gamble");
         addLog(s, `${p.name} wagered $${n} and rolled ${r}.`);
       }
@@ -2138,14 +2473,22 @@ export function applyAction(s: State, actorId: string, a: Action) {
           p.pos = q.pos;
           combatStart(s, p, [], q, false, true);
         } else {
-          const r = dice(10);
+          const r = nonCombatDie(p, 10);
           s.lastDice = [r];
           addLog(
             s,
             `${p.name} aimed Milenko’s Wand at ${q.name} and rolled ${r}.`,
           );
           s.phase = "end";
-          if (r === 1)
+          if (r === 0) {
+            ruling(
+              s,
+              p,
+              [],
+              `Milenko’s Wand rolled a modified zero, which has no printed result. Resolve this result with the table.`,
+            );
+            s.ruling!.returnPhase = "ending";
+          } else if (r === 1)
             ruling(
               s,
               p,
@@ -2185,8 +2528,50 @@ export function options(s: State, id: string): Option[] {
   const out: Option[] = [];
   const add = (label: string, action: Action, group = "Turn") =>
     out.push({ label, action, group });
+  if (s.endingPending) {
+    if (s.endingPending === id) {
+      add("Accept this ending", { type: "ending-accept" }, "Ending");
+      add(
+        "Use Psychopathic Ring · replace ending",
+        { type: "ending-replace" },
+        "Ending",
+      );
+    }
+    return out;
+  }
+  if (s.decision) {
+    if (s.decision.actor === id) {
+      if (s.decision.kind === "bone-draw") {
+        add(
+          "Use Skateboard · roll d10",
+          { type: "bone-decision", choice: "skateboard" },
+          "Bone card",
+        );
+        add(
+          "Draw the Bone card",
+          { type: "bone-decision", choice: "draw" },
+          "Bone card",
+        );
+      } else
+        for (const q of s.players.filter(
+          (q) => q.id !== id && !q.dead && !absent(q) && !q.respawn,
+        ))
+          add(
+            "Transfer Bone draw to " + q.name,
+            { type: "bone-decision", target: q.id },
+            "Bone card",
+          );
+    }
+    return out;
+  }
+  if (absent(p)) {
+    if (id === current(s).id && s.phase === "end")
+      add("End turn · temporarily absent", { type: "end" });
+    return out;
+  }
+  if (s.phase === "waiting") return out;
   if (s.overflow?.player === id) {
-    for (const item of p.items)
+    for (const item of p.items.filter((id) => !protectedItem(p, id)))
       add(
         `Discard ${cardName(item)}`,
         { type: "overflow-discard", item },
@@ -2226,8 +2611,8 @@ export function options(s: State, id: string): Option[] {
     add("Decline trade", { type: "trade-decline" }, "Trade");
   }
   if (s.ruling && (s.ruling.actor === id || s.host === id)) {
-    add("Roll d6", { type: "ruling-die", amount: 6 }, "Table ruling");
-    add("Roll d10", { type: "ruling-die", amount: 10 }, "Table ruling");
+    add("Roll raw d6", { type: "ruling-die", amount: 6 }, "Table ruling");
+    add("Roll raw d10", { type: "ruling-die", amount: 10 }, "Table ruling");
     if (s.encounter && s.ruling.cards.includes(s.encounter)) {
       const c = card(s.encounter);
       if (["item", "homie", "cash"].includes(c.kind))
@@ -2256,6 +2641,14 @@ export function options(s: State, id: string): Option[] {
     return out;
   }
   if (s.phase === "roll") {
+    if (held(p, "Crystal Ball") && !p.used.includes("crystal-ball"))
+      for (let region = 0; region < 3; region++)
+        add(
+          "Crystal Ball · inspect " +
+            ["Detroit", "Nethervoid", "Dark Carnival"][region],
+          { type: "peek", region },
+          "Items",
+        );
     add(
       p.region === 3 && s.ending !== "book"
         ? "Resolve ending turn"
@@ -2326,6 +2719,17 @@ export function options(s: State, id: string): Option[] {
     }
   }
   if (s.phase === "end") {
+    if (p.region === 0 && p.pos === 25 && s.locationDone)
+      for (const item of p.bones) {
+        const n = cardName(item),
+          cost = n === "Crabs" ? 100 : n === "Amputation" ? 300 : Infinity;
+        if (p.cash >= cost)
+          add(
+            "Cure " + n + " · $" + cost,
+            { type: "cure-bone", item },
+            "Hospital",
+          );
+      }
     add("End turn", { type: "end" });
     if (s.locationDone && shop(s, p)) {
       const prices = shop(s, p).buy.prices;
@@ -2348,7 +2752,9 @@ export function options(s: State, id: string): Option[] {
             add(`Buy ${c.name} · $${price}`, { type: "buy", item: id }, "Shop");
         }
       }
-      for (const item of p.items.filter((id) => !id.startsWith("ending-")))
+      for (const item of p.items.filter(
+        (id) => !id.startsWith("ending-") && !protectedItem(p, id),
+      ))
         add(`Sell ${cardName(item)}`, { type: "sell", item }, "Shop");
     }
     if (
@@ -2364,7 +2770,9 @@ export function options(s: State, id: string): Option[] {
     if (s.ending === "wraith")
       add("Roll against The Wraith", { type: "ending-roll" });
     if (["wand", "skull"].includes(s.ending) && s.endingHolder === p.id)
-      for (const q of s.players.filter((q) => !q.dead && q.id !== id))
+      for (const q of s.players.filter(
+        (q) => !q.dead && !q.respawn && !absent(q) && q.id !== id,
+      ))
         add(
           `Target ${q.name}`,
           { type: "ending-target", target: q.id },
@@ -2470,12 +2878,43 @@ export function publicState(s: State, session: string) {
     endingPool,
     ending,
     players,
+    peek,
     ...rest
   } = s;
-  const controlled = current(s)?.bot && me?.id === s.host ? current(s) : me;
+  const needed = [
+    s.endingPending,
+    s.decision?.actor,
+    s.overflow?.player,
+    s.penalty?.winner,
+    s.combat && !s.combat.choices[s.combat.attacker] ? s.combat.attacker : null,
+    s.combat?.defender && !s.combat.choices[s.combat.defender]
+      ? s.combat.defender
+      : null,
+    s.trade?.to,
+    s.ruling?.actor,
+    current(s)?.id,
+    me?.id,
+  ];
+  const controlled = me
+    ? needed
+        .map((id) => s.players.find((p) => p.id === id))
+        .find((p) => p && canControl(s, me.id, p))
+    : undefined;
   return {
     ...rest,
-    players: players.map(({ session, ...p }) => p),
+    players: players.map(({ session, ...p }) => ({
+      ...p,
+      controller: controllerFor(s, p as Player),
+      capacity: capacity(p as Player),
+      conditionDetails: conditionSummary(s, p as Player),
+    })),
+    serverTime: Date.now(),
+    peek:
+      peek &&
+      me &&
+      canControl(s, me.id, s.players.find((p) => p.id === peek.player)!)
+        ? peek.card
+        : null,
     me: me?.id ?? null,
     control: controlled?.id ?? null,
     ending: s.finalRevealed ? ENDINGS.find((e) => e.id === ending) : null,
@@ -2505,11 +2944,14 @@ export function publicState(s: State, session: string) {
   };
 }
 export function runBots(s: State) {
-  if (s.rulesVersion !== 2 || s.status !== "playing") return;
+  if (s.rulesVersion !== 3 || s.status !== "playing") return;
   for (let i = 0; i < 30 && s.status === "playing"; i++) {
     const p = current(s);
     if (
       !p.bot ||
+      controllerFor(s, p) !== p.id ||
+      s.endingPending ||
+      s.decision ||
       s.phase === "ruling" ||
       s.phase === "combat" ||
       s.phase === "penalty" ||

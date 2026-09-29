@@ -108,21 +108,35 @@ export function spaceRule(r: number, p: number) {
   return (spaces as any[]).find((s) => s.region === r && s.pos === p);
 }
 export function powers(s: State, p: Player) {
-  if (p.bones?.some((id) => card(id).name === "Amnesia")) return [];
-  const base = character(p.character).powers;
-  const borrowed = base.some((x) => x.id === "borrow_colocated_powers")
-    ? s.players
-        .filter(
-          (q) =>
-            q.id !== p.id &&
-            !q.dead &&
-            q.region === p.region &&
-            q.pos === p.pos,
-        )
-        .flatMap((q) => character(q.character).powers)
-        .filter((x) => x.id !== "borrow_colocated_powers")
-    : [];
-  return [...new Map([...base, ...borrowed].map((x) => [x.id, x])).values()];
+  if (
+    p.bones?.some((id) => card(id).name === "Amnesia") ||
+    (p.absentUntil && p.absentUntil > Date.now()) ||
+    p.respawn
+  )
+    return [];
+  const own = character(p.character).powers;
+  const cape = p.items.some((id) => cardName(id) === "Nosferatu's Cape");
+  const pumpkin = own.some((x) => x.id === "borrow_colocated_powers");
+  const nearby = s.players
+    .filter(
+      (q) =>
+        q.id !== p.id &&
+        !q.dead &&
+        !q.respawn &&
+        !(q.absentUntil && q.absentUntil > Date.now()) &&
+        q.region === p.region,
+    )
+    .filter((q) => {
+      const n = COUNTS[p.region] ?? 1,
+        d = Math.abs(q.pos - p.pos),
+        range = Math.min(d, n - d);
+      return (pumpkin && range === 0) || (cape && range <= 2);
+    });
+  // Borrow the printed powers, not recursively expanded copies. Each power retains its own timing and cost.
+  const borrowed = nearby
+    .flatMap((q) => character(q.character).powers)
+    .filter((x) => x.id !== "borrow_colocated_powers");
+  return [...new Map([...own, ...borrowed].map((x) => [x.id, x])).values()];
 }
 export function has(s: State, p: Player, id: string) {
   return powers(s, p).some((x) => x.id === id);

@@ -4,7 +4,7 @@ An unofficial multiplayer **assisted tabletop** for The Quest for Shangri-La. Th
 
 ## Corrected rules edition
 
-New tables use version 2. Existing prototype rooms remain readable and are preserved; they cannot be converted into a mix of incompatible rule sets.
+New tables use version 3. Existing prototype rooms remain readable and are preserved; they cannot be converted into a mix of incompatible rule sets.
 
 - All 18 character records use researched starting Life, Combat Bonus, Cash, allegiance, location, equipment, and paraphrased power descriptions.
 - All 60 board spaces have audited effects. The Pipeline costs $100 inward. The Portal costs one Item inward. Magic Ninja waives tolls; Shangri-La still requires 15 base Combat Bonus.
@@ -16,11 +16,13 @@ New tables use version 2. Existing prototype rooms remain readable and are prese
 
 ## Assisted effects and remaining fidelity limits
 
-The game automates movement, core combat, common board effects, basic purchases, and several character powers. **Most conditional cards, persistent Bones, and unusual power interactions require table adjudication.** Each component shows its paraphrased mechanics and source link. Logged controls let the resolving player or host roll dice, adjust stats, move tokens, transfer/discard/retrieve cards, and record conditions. Conditional combat modifiers are explicitly declared. These controls assume a cooperative table; they are not an anti-cheat rules engine.
+The game automates movement, core combat, common board effects, basic purchases, and several character powers. **178 component records still require some table adjudication, including conditional Action cards and unusual Item/Homie effects.** Each component shows its paraphrased mechanics and source link. Logged controls let the resolving player or host roll dice, adjust stats, move tokens, transfer/discard/retrieve cards, and record conditions. Conditional combat modifiers are explicitly declared. These controls assume a cooperative table; they are not an anti-cheat rules engine.
 
-Manual controls do not automatically enforce every timing window or override an already resolved ending/death. Resurrection Items, replacement endings, borrowed powers, temporary turn control, real-time Bone effects, and other exceptions need further automated integration. Do not treat this edition as mechanically perfect or tournament verified.
+Version 3 integrates Casket resurrection before possessions are lost, Psychopathic Ring replacement before an ending resolves, Pumpkin Carver/Nosferatu’s Cape borrowed powers, Crystal Ball private inspection, and all thirteen Bone paths. Durations, delegated control, real-time absence, movement penalties, acquisition restrictions and cures are persisted. Manual controls still do not enforce every exceptional card interaction. Do not treat this edition as mechanically perfect or tournament verified.
 
-The community inventory repeats a 19-card Detroit atlas. Three Detroit title readings remain uncertain. The observed counts have not been certified against a complete physical retail set. Starting equipment is allocated from this observed finite supply; combinations exhausting it are rejected rather than manufacturing cards. Card artwork is not reproduced. The board photograph retains glare and cropping. Shared online rooms require every participant to have access under the Site’s existing sharing settings.
+Timing conventions are visible in the rules panel: timed Bones count future full turns and apply immediately, the left-hand controller follows fixed lobby order, King High Bone lasts ten real minutes including disconnect time, Amputation caps Items at three even with Backpack, and Concussion clears on an unmodified movement total of six. These fill ambiguities in the printed cards.
+
+The community inventory repeats a 19-card Detroit atlas. Three Detroit title readings remain uncertain. Page 1 of the scanned rulebook lists 110 Detroit, 90 Nethervoid, 70 Dark Carnival, 42 Purchase and 13 Bone cards. The recovered records therefore fall short, and their identities/copy counts have not been certified against a complete physical retail set. Starting equipment is allocated from this observed finite supply; combinations exhausting it are rejected rather than manufacturing cards. Card artwork is not reproduced. The board photograph retains glare and cropping. Shared online rooms require every participant to have access under the Site’s existing sharing settings.
 
 ## Sources
 
@@ -36,4 +38,4 @@ Node 22.13+ (Node 24 recommended). Install dependencies with `npm run install:ci
 
 `npm test` checks character setup, finite stock, turn permissions, passage costs, combat, trade consent, table adjudication, inventory limits, death, ending structures, and legacy-room preservation. Type checking: `npx tsc --noEmit`.
 
-Validation for this update: 33 engine tests, TypeScript checks, browser lobby/combat/turn handoff, and local HTTP checks with independent sessions for create/join/ready/start, spectators, concurrent moves, encounter resolution and reconnection. This validates the implementation paths covered, not full physical-game fidelity.
+Validation is recorded in `docs/validation.md`. Automated checks cover implemented rules, persistent state and player permissions; they do not establish physical-game fidelity or replace human acceptance playtesting.

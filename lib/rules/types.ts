@@ -69,6 +69,13 @@ export type Player = {
   used: string[];
   boost: number;
   respawn?: boolean;
+  respawnAt?: { region: number; pos: number };
+  casketRecovery?: string;
+  absentUntil?: number;
+  conditions?: Record<
+    string,
+    { expiresAfterTurn?: number; branch?: "arm" | "leg"; controller?: string }
+  >;
   lootFor?: string;
   lootTurns?: number;
 };
@@ -121,7 +128,7 @@ export type Ruling = {
   bone?: boolean;
 };
 export type State = {
-  rulesVersion: 2;
+  rulesVersion: 3;
   direction?: number;
   code: string;
   status: "lobby" | "playing" | "finished";
@@ -138,7 +145,9 @@ export type State = {
     | "overflow"
     | "ruling"
     | "end"
-    | "ending";
+    | "ending"
+    | "waiting"
+    | "decision";
   roll: number | null;
   choices: Destination[];
   encounter: string | null;
@@ -153,6 +162,15 @@ export type State = {
   endingPool: string[];
   finalRevealed: boolean;
   finalEntered: boolean;
+  endingDiscard?: string[];
+  endingPending?: string | null;
+  decision?: {
+    kind: "bone-draw" | "bone-transfer";
+    actor: string;
+    item?: string;
+    returnPhase: State["phase"];
+  } | null;
+  peek?: { player: string; card: string } | null;
   endingHolder: string | null;
   endingProgress: Record<string, number>;
   usedCharacters: string[];
@@ -195,6 +213,7 @@ export type Action = {
   giveCash?: number;
   askCash?: number;
   cards?: string[];
+  winners?: string[];
   reason?: string;
   deck?: number | "bone" | "purchase";
   allegiance?: Allegiance;

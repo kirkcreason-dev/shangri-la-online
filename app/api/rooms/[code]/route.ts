@@ -1,4 +1,4 @@
-import { CHARACTERS, newPlayer, publicState, addLog } from "@/lib/game";
+import { CHARACTERS, newPlayer, publicState, addLog, tick } from "@/lib/game";
 import {
   session,
   readRoom,
@@ -7,18 +7,27 @@ import {
   playerInput,
   result,
   fail,
+  ConflictError,
 } from "@/lib/store";
 type Context = { params: Promise<{ code: string }> };
 export async function GET(_req: Request, c: Context) {
   try {
     const { code } = await c.params;
-    const s = await readRoom(code.toUpperCase());
+    let s = await readRoom(code.toUpperCase());
     if (!s)
       return result(
         { error: "That room was not found. Check the invite code." },
         404,
       );
     const sid = await session();
+    const rev = s.rev;
+    if (tick(s))
+      try {
+        await saveRoom(s, rev);
+      } catch (e) {
+        if (!(e instanceof ConflictError)) throw e;
+        s = (await readRoom(code.toUpperCase()))!;
+      }
     return result(publicState(s, sid));
   } catch (e) {
     return fail(e);
@@ -34,7 +43,7 @@ export async function POST(req: Request, c: Context) {
     if (!s) return result({ error: "That room was not found." }, 404);
     if (s.players.some((p) => p.session === sid))
       return result(publicState(s, sid));
-    if (s.rulesVersion !== 2)
+    if (s.rulesVersion !== 3)
       throw new Error("Create a new table to use the corrected rules.");
     if (s.status !== "lobby")
       throw new Error(

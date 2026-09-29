@@ -2,10 +2,10 @@ export * from "./rules/engine.ts";
 import { publicState as correctedPublicState } from "./rules/engine.ts";
 import type { State } from "./rules/types.ts";
 export function publicState(s: State, session: string) {
-  if (s.rulesVersion === 2) return correctedPublicState(s, session);
+  if (s.rulesVersion === 3) return correctedPublicState(s, session);
   const old = s as any;
   return {
-    rulesVersion: 1,
+    rulesVersion: old.rulesVersion ?? 1,
     legacy: true,
     code: old.code,
     status: old.status,
