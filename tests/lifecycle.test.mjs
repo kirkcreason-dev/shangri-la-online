@@ -221,7 +221,7 @@ test("unrevealed replacement endings and deck order stay private", () => {
   assert.equal(v.decks, undefined);
 });
 test("Pumpkin Carver borrows printed powers only from colocated players", () => {
-  const s = game(["Pumpkin Carver", "Blaze", "Violent J"]),
+  const s = game(["Pumpkin Carver", "Digital Duke", "Violent J"]),
     [p, q, r] = s.players;
   q.region = p.region;
   q.pos = p.pos;
@@ -232,7 +232,7 @@ test("Pumpkin Carver borrows printed powers only from colocated players", () => 
   assert.ok(!has(s, p, "steal_homie"));
 });
 test("Cape range wraps around a region but does not cross regions", () => {
-  const s = game(["Killnor", "Blaze", "Violent J"]),
+  const s = game(["Killnor", "Digital Duke", "Violent J"]),
     [p, q, r] = s.players;
   item(s, p, "Nosferatu's Cape");
   p.region = 0;
@@ -247,7 +247,7 @@ test("Cape range wraps around a region but does not cross regions", () => {
   assert.ok(!has(s, p, "combat_nine_as_ten"));
 });
 test("Amnesia disables borrowed powers and arrival at the starting space cures it", () => {
-  const s = game(["Pumpkin Carver", "Blaze", "Violent J"]),
+  const s = game(["Pumpkin Carver", "Digital Duke", "Violent J"]),
     p = s.players[0],
     q = s.players[1];
   q.pos = p.pos;
@@ -712,7 +712,7 @@ test("many missed turns do not leave a present table stuck waiting for an absenc
     "Violent J",
     "Mack Benjamin",
     "Double A",
-    "Blaze",
+    "Digital Duke",
     "Squeezy",
   ]);
   for (const p of s.players) p.skip = 10;

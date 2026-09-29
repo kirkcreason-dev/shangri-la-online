@@ -1018,14 +1018,18 @@ export default function Home() {
             focus={myTurn ? p?.id : me?.id}
             dice={room?.lastDice}
             choices={choices}
+            turnKey={`${room?.round}:${room?.turn}:${room?.phase}:${room?.rev}`}
             active={room?.status === "playing" ? active?.id : undefined}
             disabled={busy || offline}
             onMove={move}
+            tollItems={p?.items.filter(id => !id.startsWith("ending-")).map(id => ({id, label: cardName(id)}))}
+            tollItem={tollItem}
+            onTollItemChange={setTollItem}
           />
           <div className="table-footer">
             <span>
               60 mapped spaces ·{" "}
-              {room?.space?.name ?? "Original board reference"}
+              {room?.space?.name ?? "Explore every space"}
             </span>
             <span>{CHARACTERS.length} characters · 10 endings</span>
           </div>
@@ -1420,44 +1424,8 @@ export default function Home() {
                     !room.pendingCard &&
                     !room.itemPrompt && (
                       <>
-                        <p>Choose a highlighted destination.</p>
-                        {choices.some((d) => d.itemToll) && (
-                          <label>
-                            Item to pay at the Portal
-                            <select
-                              value={tollItem}
-                              onChange={(e) => setTollItem(e.target.value)}
-                            >
-                              <option value="">
-                                Choose only if crossing inward
-                              </option>
-                              {p?.items
-                                .filter((id) => !id.startsWith("ending-"))
-                                .map((id) => (
-                                  <option key={id} value={id}>
-                                    {cardName(id)}
-                                  </option>
-                                ))}
-                            </select>
-                          </label>
-                        )}
-                        <div className="actions">
-                          {choices.map((d, i) => (
-                            <button
-                              key={`${d.region}:${d.pos}:${i}`}
-                              disabled={busy || offline || (d.itemToll && !tollItem)}
-                              onClick={() => move(d.region, d.pos)}
-                            >
-                              {spaceName(d.region, d.pos)}
-                              <span className="choice-detail">
-                                {REGIONS[d.region] ?? "Shangri-La"}
-                                {d.toll ? ` · $${d.toll}` : ""}
-                                {d.itemToll ? " · discard 1 Item" : ""}
-                                {d.reason ? ` · ${d.reason}` : ""}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
+                        <p>Preview a destination on the board, check its rules and toll, then confirm your move.</p>
+                        <button className="primary" onClick={() => jumpToTableSection("table-board")}>Choose on the board ↑</button>
                       </>
                     )}
                   {inCombat && p && !room.pendingCard && !room.itemPrompt && (

@@ -3,8 +3,15 @@ import board from "../board.json" with { type: "json" };
 import cards from "./cards.json" with { type: "json" };
 import spaces from "./spaces.json" with { type: "json" };
 import type { Card, Player, State } from "./types.ts";
-const retiredCharacters = new Set(["Jamie Madrox", "Monoxide"]);
-export const ROSTER = characters.filter((c) => !retiredCharacters.has(c.name));
+export const CHARACTER_REPLACEMENTS: Record<string, string> = {
+  Blaze: "Digital Duke",
+  "Jamie Madrox": "Nocturnal Deadhead",
+  Monoxide: "3 ZEE",
+};
+// These edition characters inherit one complete rules set each.
+export const ROSTER = characters.map(c => CHARACTER_REPLACEMENTS[c.name]
+  ? { ...c, name: CHARACTER_REPLACEMENTS[c.name], id: CHARACTER_REPLACEMENTS[c.name].toLowerCase().replaceAll(' ', '_'), powers: c.powers.map(p => ({ ...p })) }
+  : c);
 export const CHARACTERS = ROSTER.map((c) => c.name);
 export const REGIONS = ["Detroit", "Nethervoid", "Dark Carnival"];
 export const COLORS = [
@@ -85,7 +92,7 @@ export const ENDINGS = [
 export function character(name: string) {
   // Retain saved-character rules so existing tables remain readable.
   // New seats and replacement draws use only the active roster above.
-  const c = characters.find((c) => c.name === name);
+  const c = ROSTER.find((c) => c.name === name) ?? characters.find((c) => c.name === name);
   if (!c) throw new Error("Choose a character from the available roster.");
   return c;
 }

@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { gameAsset } from "@/lib/client-connection";
+import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { BoardArtwork } from "./BoardArtwork";
+import { BOARD_SPACES, REGION_INKS, boardPosition as position, spaceInfo, sameSpace, searchSpaces, destinationCost, destinationContext, confirmedDestination, type BoardAddress, type BoardDestination } from "@/lib/board-display";
 import board from "@/lib/board.json";
 import { GATES, REGIONS } from "@/lib/game";
 import { OVERVIEW, cameraCorners, facingRotation, fitCamera, nearestAngle, panCamera, zoomCamera, type Camera, type Point } from "@/lib/board-camera";
@@ -8,21 +9,59 @@ export { REGIONS } from "@/lib/game";
 export function spaceName(r: number, p: number) {
   return r === 3 ? "Shangri-La" : (board.regions[r]?.[p] ?? "Unknown space");
 }
-function position(region: number, pos: number): Point {
-  const space = board.spaces[region]?.[pos];
-  return space ? { x: space.column * 100 + 50, y: space.row * 100 + 50 } : { x: 400, y: 450 };
-}
 type Piece = { id: string; name: string; character?: string; region: number; pos: number; color: string; dead?: boolean; absentUntil?: number };
 type Gesture = { points: Map<number, Point>; start: Point; camera: Camera; distance?: number; angle?: number; moved: boolean; spin: boolean };
-export default function Board({ players = [], choices = [], onMove, active, focus, disabled = false, dice = [] }: {
+export default function Board({ players = [], choices = [], onMove, active, focus, disabled = false, dice = [], turnKey = "", tollItems = [], tollItem = "", onTollItemChange }: {
   players?: Piece[];
-  choices?: { region: number; pos: number }[];
+  choices?: BoardDestination[];
+  turnKey?: string;
+  tollItems?: {id: string; label: string}[];
+  tollItem?: string;
+  onTollItemChange?: (id: string) => void;
   onMove?: (r: number, p: number) => void;
   active?: string;
   focus?: string;
   disabled?: boolean;
   dice?: number[];
 }) {
+  const id = useId().replaceAll(":", "");
+  const details = useRef<HTMLElement>(null);
+  const shell = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [original, setOriginal] = useState(false);
+  const [labels, setLabels] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selection, setSelection] = useState<{at: BoardAddress; context: string} | null>(null);
+  useEffect(() => {
+    if(selection) details.current?.scrollIntoView({block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+  }, [selection]);
+  const [tabStop, setTabStop] = useState("0:0");
+  const context = destinationContext(turnKey, choices);
+  const destination = confirmedDestination(selection, context, choices);
+  useEffect(() => {
+    try { const v = JSON.parse(localStorage.getItem("qsl_board_view") ?? "{}"); setOriginal(v.original === true); setLabels(v.labels !== false); } catch { /* Defaults remain usable. */ }
+  }, []);
+  function saveView(photo: boolean, names: boolean) {
+    setOriginal(photo); setLabels(names);
+    try { localStorage.setItem("qsl_board_view", JSON.stringify({original: photo, labels: names})); } catch { /* Optional preference. */ }
+  }
+  useEffect(() => {
+    if (!expanded) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    shell.current?.querySelector<HTMLElement>("button")?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setExpanded(false); }
+      if (event.key !== "Tab") return;
+      const elements = [...(shell.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input, [tabindex="0"]') ?? [])].filter(e => e.getClientRects().length);
+      const first = elements[0], last = elements.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !shell.current?.contains(document.activeElement))) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", key);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", key); previous?.focus(); };
+  }, [expanded]);
   const [camera, setCamera] = useState<Camera>(OVERVIEW);
   const [mode, setMode] = useState<"me" | "turn" | "free">("me");
   const [dragging, setDragging] = useState(false);
@@ -117,13 +156,53 @@ export default function Board({ players = [], choices = [], onMove, active, focu
     } else { gesture.current = null; setDragging(false); }
   }
   const location = tracked ?? own ?? current;
-  const caption = hover ?? (location ? { name: spaceName(location.region, location.pos), region: location.region === 3 ? "The final destination" : REGIONS[location.region] } : null);
+  const inspected = spaceInfo(selection?.at ?? (location ? {region: location.region, pos: location.pos} : {region: 0, pos: 0}));
+  const occupants = visiblePlayers.filter(p => sameSpace(p, inspected));
+  const results = searchSpaces(search);
+  function inspect(at: BoardAddress, frame = false) {
+    setSelection({at, context}); setTabStop(`${at.region}:${at.pos}`);
+    if (frame) { setMode("free"); const point = position(at.region, at.pos); setCamera(c => fitCamera([point], facingRotation(point, c.rotation))); }
+    setSearch("");
+  }
+  function regionView(region: number) {
+    setMode("free"); setSelection(null);
+    setCamera(c => fitCamera(board.spaces[region].map(s => position(region, s.index)), nearestAngle(0, c.rotation)));
+  }
+  function tileKey(event: React.KeyboardEvent<SVGRectElement>, at: BoardAddress) {
+    if (["Enter", " "].includes(event.key)) { event.preventDefault(); inspect(at); return; }
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) || at.region === 3) return;
+    event.preventDefault();
+    const count = board.spaces[at.region].length;
+    const pos = (at.pos + (["ArrowRight", "ArrowDown"].includes(event.key) ? 1 : -1) + count) % count;
+    setTabStop(`${at.region}:${pos}`);
+    setMode("free"); setCamera(c => fitCamera([position(at.region, pos)], facingRotation(position(at.region, pos), c.rotation)));
+    shell.current?.querySelector<SVGRectElement>(`[data-space="${at.region}:${pos}"]`)?.focus();
+  }
+  function confirmMove() {
+    const next = confirmedDestination(selection, context, choices);
+    if (next && !disabled && (!next.itemToll || tollItems.some(item => item.id === tollItem))) { onMove?.(next.region, next.pos); setSelection(null); setMode("me"); }
+  }
   return (
-    <div className="board-wrap interactive-board">
+    <div ref={shell} className={`board-wrap interactive-board rebuilt-board${expanded ? " board-expanded" : ""}`} role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined} aria-label={expanded ? "Expanded game board" : undefined}>
+      <div className="board-edition-toolbar">
+        <div className="board-edition-title"><span>THE WORLD OF SHANGRI-LA</span><strong>{original ? "Original board" : "The living board"}</strong></div>
+        <div className="board-display-options">
+          <button type="button" aria-pressed={!original} onClick={() => saveView(false, labels)}>Enhanced</button>
+          <button type="button" aria-pressed={original} onClick={() => saveView(true, labels)}>Original</button>
+          <button type="button" disabled={original} aria-pressed={labels && !original} onClick={() => saveView(original, !labels)}>Aa <span>Labels</span></button>
+          <button type="button" className="expand-board" onClick={() => setExpanded(!expanded)}>{expanded ? "✕ Close" : "⛶ Expand"}</button>
+        </div>
+      </div>
+      <div className="board-explorer">
+        <div className="board-region-tabs" aria-label="Explore a region">{REGIONS.map((name,r) => <button type="button" key={name} style={{color:REGION_INKS[r]}} onClick={() => regionView(r)}><i style={{background:REGION_INKS[r]}}/>{name}</button>)}</div>
+        <div className="board-search"><label className="sr-only" htmlFor={`${id}-search`}>Find a board space</label><input id={`${id}-search`} placeholder="Find a space…" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => {if(e.key === "Escape") {e.stopPropagation();setSearch("");}}}/>
+          {search.trim() && <div className="board-search-results" aria-label="Matching spaces">{results.length ? results.map(s => <button type="button" key={`${s.region}:${s.pos}`} onClick={() => inspect(s, true)}><strong>{s.name}</strong><span>{REGIONS[s.region]} · {s.pos+1}</span></button>) : <p>No matching spaces.</p>}</div>}
+        </div>
+      </div>
       <div className="board-camera-toolbar" aria-label="Board camera controls">
         <div className="board-view-modes">
-          <button type="button" aria-pressed={mode === "me" && !!own} disabled={!own} onClick={() => resetFollow("me")}>◎ Follow me</button>
-          <button type="button" aria-pressed={mode === "turn"} disabled={!current} onClick={() => resetFollow("turn")}>Follow turn</button>
+          <button type="button" aria-pressed={mode === "me" && !!own} disabled={!own} onClick={() => {setSelection(null);resetFollow("me");}}>◎ Follow me</button>
+          <button type="button" aria-pressed={mode === "turn"} disabled={!current} onClick={() => {setSelection(null);resetFollow("turn");}}>Follow turn</button>
           <button type="button" onClick={overview}>Full board</button>
         </div>
         <div className="board-lens-controls">
@@ -135,8 +214,10 @@ export default function Board({ players = [], choices = [], onMove, active, focu
           <button type="button" aria-label="Zoom in" disabled={camera.zoom >= 3} onClick={() => zoom(1.25)}>+</button>
         </div>
       </div>
+      <div className="board-workspace">
+      <div className="board-stage">
       <div className={"photo-board board-viewport" + (dragging ? " is-dragging" : "")}
-        ref={viewport} tabIndex={0} role="region" aria-label="Interactive game board. Drag to pan. Shift-drag to rotate. Use arrow keys to pan, plus and minus to zoom, and Home to follow your piece."
+        ref={viewport} tabIndex={0} role="region" aria-label="Interactive game board. Select a space to read it. Drag to pan. Shift-drag to rotate. Use arrow keys to pan, plus and minus to zoom, and Home to follow your piece."
         onPointerDown={startGesture} onPointerMove={moveGesture} onPointerUp={endGesture} onPointerCancel={endGesture}
         onPointerLeave={e => { setHover(null); if (!e.currentTarget.hasPointerCapture(e.pointerId)) endGesture(e); }}
         onClickCapture={e => { if (suppressClick.current && e.detail !== 0) { e.preventDefault(); e.stopPropagation(); } }}
@@ -146,7 +227,7 @@ export default function Board({ players = [], choices = [], onMove, active, focu
           if (arrows[e.key]) { e.preventDefault(); setMode("free"); setCamera(c => panCamera(c, ...arrows[e.key])); }
           else if (["+", "=", "-", "Home", "[", "]"].includes(e.key)) {
             e.preventDefault();
-            if (e.key === "Home") resetFollow("me");
+            if (e.key === "Home") { if(own) resetFollow("me"); else overview(); }
             else if (e.key === "[") spin(-90);
             else if (e.key === "]") spin(90);
             else zoom(e.key === "-" ? 1 / 1.25 : 1.25);
@@ -154,68 +235,63 @@ export default function Board({ players = [], choices = [], onMove, active, focu
         }}>
         <svg className="board-scene" viewBox="0 0 800 800" aria-label="Game board; highlighted spaces are legal destinations">
           <g className="board-camera" data-camera-x={camera.x.toFixed(1)} data-camera-y={camera.y.toFixed(1)} data-camera-rotation={camera.rotation.toFixed(1)} style={{ transform: `translate(400px, 400px) scale(${camera.zoom}) rotate(${camera.rotation}deg) translate(${-camera.x}px, ${-camera.y}px)` }}>
-            <image href={gameAsset("board-reference.jpg")} width="800" height="800" preserveAspectRatio="xMidYMid slice" pointerEvents="none" aria-label="The Quest for Shangri-La original board reference photograph" />
-            {board.spaces.map((spaces, r) => spaces.map(s => {
-              const selected = choices.some(c => c.region === r && c.pos === s.index);
-              const here = location?.region === r && location?.pos === s.index;
-              return <g key={`${r}:${s.index}`}>
-                <rect x={s.column * 100 + 4} y={s.row * 100 + 4} width="92" height="92" rx="6"
-                  className={`board-space${selected ? " legal" : ""}${here ? " occupied" : ""}`}
-                  role={selected ? "button" : undefined} tabIndex={selected && !disabled ? 0 : undefined}
-                  aria-disabled={selected ? disabled : undefined}
-                  aria-label={selected ? `Move to ${s.name}, ${REGIONS[r]} ${s.index + 1}` : `${s.name} · ${REGIONS[r]} ${s.index + 1}`}
-                  onPointerEnter={() => { if (!gesture.current?.moved) setHover({ name: s.name, region: REGIONS[r] }); }}
-                  onFocus={() => setHover({ name: s.name, region: REGIONS[r] })} onBlur={() => setHover(null)}
-                  onClick={() => selected && !disabled && onMove?.(r, s.index)}
-                  onKeyDown={e => { if (selected && !disabled && ["Enter", " "].includes(e.key)) { e.preventDefault(); onMove?.(r, s.index); } }} />
-                {s.index === GATES[r] && <g pointerEvents="none" transform={`translate(${s.column * 100 + 82} ${s.row * 100 + 18})`}><circle r="12" fill="#16131c" stroke="#e7c375" strokeWidth="2"/><text y="6" fill="#ffe0a2" fontSize="18" textAnchor="middle">◇</text></g>}
-                {selected && <circle className="destination-spark" cx={s.column * 100 + 18} cy={s.row * 100 + 18} r="7" pointerEvents="none" />}
+            <BoardArtwork id={id} rotation={camera.rotation} labels={labels} original={original}/>
+            {BOARD_SPACES.map(s => {
+              const legal = choices.some(c => sameSpace(c,s));
+              const selected = sameSpace(selection?.at,s);
+              return <g key={`${s.region}:${s.pos}`}>
+                <rect x={s.column*100+4} y={s.row*100+4} width="92" height="92" rx="4"
+                  data-space={`${s.region}:${s.pos}`} className={`board-space inspectable${legal ? " legal" : ""}${selected ? " inspected" : ""}`}
+                  role="button" tabIndex={tabStop === `${s.region}:${s.pos}` || (!tabStop.startsWith(`${s.region}:`) && s.pos === 0) ? 0 : -1} aria-pressed={selected}
+                  aria-label={`Inspect ${s.name}, ${REGIONS[s.region]} ${s.pos+1}${legal ? ", available destination" : ""}`}
+                  onPointerEnter={() => { if(!gesture.current?.moved) setHover({name:s.name,region:REGIONS[s.region]}); }}
+                  onFocus={() => setHover({name:s.name,region:REGIONS[s.region]})} onBlur={() => setHover(null)}
+                  onClick={() => inspect(s)} onKeyDown={e => tileKey(e,s)}/>
+                {s.pos === GATES[s.region] && <g pointerEvents="none" className="board-upright" style={{transform:`translate(${s.column*100+82}px, ${s.row*100+17}px) rotate(${-camera.rotation}deg)`}}><circle r="10" fill="#20171e" stroke="#f2d095" strokeWidth="1.3"/><text y="4" fill="#ffe0a2" fontSize="13" textAnchor="middle">◇</text></g>}
+                {legal && <circle className="destination-spark" cx={s.column*100+15} cy={s.row*100+15} r="5" pointerEvents="none"/>}
               </g>;
-            }))}
-            <rect x="307" y="307" width="186" height="186" rx="12" className={choices.some(c => c.region === 3) ? "board-space legal center-patch" : "center-patch"}
-              onClick={() => !disabled && choices.some(c => c.region === 3) && onMove?.(3, 0)}
-              role={choices.some(c => c.region === 3) ? "button" : undefined}
-              tabIndex={choices.some(c => c.region === 3) && !disabled ? 0 : undefined} aria-label="Enter Shangri-La"
-              onKeyDown={e => { if (!disabled && choices.some(c => c.region === 3) && ["Enter", " "].includes(e.key)) { e.preventDefault(); onMove?.(3, 0); } }} />
-            <g className="board-upright" style={{ transform: `translate(400px, 400px) rotate(${-camera.rotation}deg)` }} pointerEvents="none">
-              <text x="0" y="-35" className="center-small" style={{ fontSize: 13 }}>THE QUEST FOR</text>
-              <text x="0" y="1" className="center-title" style={{ fontSize: 32 }}>Shangri-La</text>
-              <text x="0" y="30" className="center-small" style={{ fontSize: 12 }}>COMBAT BONUS 15+</text>
-            </g>
+            })}
+            <rect x="306" y="306" width="188" height="188" rx="5" data-space="3:0" className={`board-space inspectable${choices.some(c=>c.region===3)?" legal":""}${selection?.at.region===3?" inspected":""}`}
+              role="button" tabIndex={0} aria-label="Inspect Shangri-La" aria-pressed={selection?.at.region===3} onClick={() => inspect({region:3,pos:0})} onKeyDown={e => tileKey(e,{region:3,pos:0})}/>
             {visiblePlayers.map(p => {
-              const q = position(p.region, p.pos), same = visiblePlayers.filter(o => o.region === p.region && o.pos === p.pos), i = same.findIndex(o => o.id === p.id);
-              return <g key={p.id} className="board-pawn" style={{ transform: `translate(${q.x + (i - (same.length - 1) / 2) * 27}px, ${q.y + 2}px)` }} pointerEvents="none">
-                {(p.id === location?.id || p.id === active) && <circle key={`${p.region}:${p.pos}`} className="pawn-arrival" r="32" fill="none" stroke={p.color} strokeWidth="3" />}
-                {p.id === active && <circle className="pawn-turn-ring" r="29" fill="none" stroke="white" strokeWidth="2" strokeDasharray="7 5" />}
-                <circle className="pawn-shadow" r={p.id === focus ? 25 : 21} fill={p.color} stroke={p.id === focus ? "white" : "#17121f"} strokeWidth="4" />
-                <g className="board-upright" style={{ transform: `rotate(${-camera.rotation}deg)` }}>
-                  <text y="7" className="pawn-letter" style={{ fontSize: 20 }}>{p.name[0]?.toUpperCase()}</text>
-                  {p.id === focus && <><rect x="-23" y="30" width="46" height="19" rx="7" fill="#15111ded"/><text y="43" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#fff">YOU</text></>}
+              const q=position(p.region,p.pos), same=visiblePlayers.filter(o=>sameSpace(o,p)), i=same.findIndex(o=>o.id===p.id);
+              const offset = (i-(same.length-1)/2)*19;
+              return <g key={p.id} className="board-pawn" style={{transform:`translate(${q.x}px, ${q.y}px)`}} pointerEvents="none">
+                <g className="board-upright" style={{transform:`rotate(${-camera.rotation}deg)`}}>
+                  <g transform={`translate(${offset} -12)`}>
+                    {p.id===active && <circle className="pawn-turn-ring" r="22" fill="none" stroke="#fff3ce" strokeWidth="1.5" strokeDasharray="4 4"/>}
+                    <circle className="pawn-shadow" r={p.id===focus?18:15} fill="#151222" stroke={p.color} strokeWidth="3"/>
+                    <circle r="11" fill={p.color}/><text y="4" textAnchor="middle" fill="#16121b" fontSize="12" fontWeight="800">{p.name[0]?.toUpperCase()}</text>
+                    {p.id===focus && <><rect x="-13" y="14" width="26" height="10" rx="3" fill="#fff2cf"/><text y="21.5" textAnchor="middle" fontSize="6" fontWeight="bold" fill="#21182c">YOU</text></>}
+                    <circle key={`${p.region}:${p.pos}`} className="pawn-arrival" r="25" fill="none" stroke={p.color} strokeWidth="2"/>
+                  </g>
                 </g>
               </g>;
             })}
           </g>
         </svg>
-        {choices.length > 0 && <div className="board-move-prompt" role="status"><span className="live-dot"/>Choose a glowing space <b>{choices.length}</b></div>}
-        {dice.length > 0 && <div className="board-last-roll" aria-label={`Last roll: ${dice.join(", ")}`}><span>LAST ROLL</span><div>{dice.map((value, i) => <b key={`${i}:${value}`} className="board-die">{value}</b>)}</div></div>}
+        {choices.length > 0 && <div className="board-move-prompt" role="status"><span className="live-dot"/>Preview a destination <b>{choices.length}</b></div>}
+        {dice.length > 0 && <div className="board-last-roll" aria-label={`Last roll: ${dice.join(", ")}`}><span>LAST ROLL</span><div>{dice.map((value,i)=><b key={`${i}:${value}`} className="board-die">{value}</b>)}</div></div>}
       </div>
-      <div className="board-statusbar">
-        <div className="board-location" aria-live="polite">
-          <span className="board-location-kicker">{hover ? "EXPLORE THE BOARD" : tracked ? `${tracked.id === focus ? "YOUR PIECE" : tracked.name.toUpperCase()} · FOLLOWING` : "FREE LOOK"}</span>
-          <strong>{caption?.name ?? "The world awaits."}</strong>
-          <span>{caption?.region ?? "Drag, zoom, and spin to explore."}</span>
-        </div>
-        <button type="button" className="board-minimap" aria-label="Show full board" title="Show full board" onPointerDown={e => { suppressClick.current = false; e.stopPropagation(); }} onClick={overview}>
-          <svg viewBox="0 0 800 800" aria-hidden="true">
-            <rect x="10" y="10" width="780" height="780" rx="25" fill="#15131d"/>
-            {[0, 1, 2].map(r => <rect key={r} x={20 + r * 100} y={20 + r * 100} width={760 - r * 200} height={760 - r * 200} rx="12" fill="none" stroke={["#df7280", "#a994ee", "#e7c375"][r]} strokeWidth="12" opacity=".7"/>)}
-            <polygon points={cameraCorners(camera).map(p => `${p.x},${p.y}`).join(" ")} fill="#fff1" stroke="#fff8" strokeWidth="8"/>
-            {visiblePlayers.map(p => { const q = position(p.region, p.pos); return <circle key={p.id} cx={q.x} cy={q.y} r={p.id === focus ? 30 : 23} fill={p.color} stroke={p.id === focus ? "white" : "#14111c"} strokeWidth="9"/>; })}
-          </svg><span>FULL BOARD</span>
-        </button>
+      <div className="board-camera-hint"><span>{hover ? `${hover.name} · ${hover.region}` : "Tap a space to read its rules"}</span><span>Drag · Shift-drag to spin · Pinch to zoom</span></div>
       </div>
-      <div className="board-camera-hint"><span>Drag to explore · Shift-drag to spin</span><span>Pinch to zoom & rotate</span></div>
-      <div className="board-legend"><span><i className="red"/>Detroit</span><span><i className="violet"/>Nethervoid</span><span><i className="gold"/>Dark Carnival</span></div>
+      <aside ref={details} className="board-detail" aria-label="Space details">
+        <div className="board-detail-heading"><span className="eyebrow">{destination ? "DESTINATION PREVIEW" : selection ? "EXPLORING" : location ? "CURRENT SPACE" : "EXPLORE THE BOARD"}</span><button type="button" className="quiet" onClick={() => {setSelection(null);overview();}}>↗ Overview</button></div>
+        <div className="board-detail-title"><div><span style={{color:REGION_INKS[inspected?.region ?? 0] ?? "#efd18b"}}>{inspected?.region===3 ? "The final destination" : `${REGIONS[inspected?.region ?? 0]} · Space ${(inspected?.pos ?? 0)+1}`}</span><h3>{inspected?.name}</h3></div>
+        <svg className="board-detail-map" viewBox="0 0 800 800" aria-label="Board overview">
+          <rect width="800" height="800" rx="30" fill="#15121d"/>
+          {[0,1,2].map(r=><rect key={r} x={20+r*100} y={20+r*100} width={760-r*200} height={760-r*200} rx="10" fill="none" stroke={REGION_INKS[r]} strokeWidth="10" opacity=".7"/>)}
+          <polygon points={cameraCorners(camera).map(p=>`${p.x},${p.y}`).join(' ')} fill="#fff1" stroke="#fff6" strokeWidth="6"/>
+          {inspected && <circle cx={position(inspected.region,inspected.pos).x} cy={position(inspected.region,inspected.pos).y} r="27" fill="#fff0ca"/>}
+          {visiblePlayers.map(p=><circle key={p.id} cx={position(p.region,p.pos).x} cy={position(p.region,p.pos).y} r="20" fill={p.color} stroke="#14111c" strokeWidth="6"/>)}
+        </svg></div>
+        <p className="board-space-rules">{inspected?.rules}</p>
+        {occupants.length>0 && <div className="board-occupants">{occupants.map(p=><span key={p.id}><i style={{background:p.color}}/>{p.name}{p.id===focus?" (you)":""}<small>{p.character}</small></span>)}</div>}
+        {destination ? <div className="board-confirm"><p>{destinationCost(destination)}</p>{destination.itemToll && <label className="board-toll-label">Choose an Item to pay at the Portal<select value={tollItem} onChange={e=>onTollItemChange?.(e.target.value)}><option value="">Select the Item to discard</option>{tollItems.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}<button type="button" className="primary" disabled={disabled || (destination.itemToll && !tollItems.some(item=>item.id===tollItem))} onClick={confirmMove}>Move to {inspected?.name} →</button><span>Only this button moves your piece.</span></div> : selection && choices.length>0 ? <p className="board-not-destination">This space is not an available destination for this roll.</p> : null}
+        {choices.length>0 && <div className="board-destinations"><span>YOUR AVAILABLE DESTINATIONS</span><div>{choices.map(c=><button type="button" key={`${c.region}:${c.pos}`} aria-pressed={sameSpace(selection?.at,c) && !!destination} onClick={()=>inspect(c,true)}><strong>{spaceName(c.region,c.pos)}</strong><small>{REGIONS[c.region] ?? "Shangri-La"}{c.toll?` · $${c.toll}`:""}{c.itemToll?" · 1 Item":""}</small></button>)}</div></div>}
+        <p className="board-preserved">Same 60-space layout · Original tile artwork<br/>Names and controls stay readable as the board turns.</p>
+      </aside>
+      </div>
     </div>
   );
 }

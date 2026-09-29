@@ -85,7 +85,7 @@ function fight(s, p, q, values = [10, 1], extra = {}) {
   );
 }
 test("active roster and researched encounter decks retain their expected counts", () => {
-  assert.equal(ROSTER.length, 16);
+  assert.equal(ROSTER.length, 18);
   assert.equal(ENDINGS.length, 10);
   assert.deepEqual(
     [0, 1, 2].map((r) =>
@@ -122,7 +122,7 @@ test("all playable characters start with audited unique records and starting Ite
   assert.equal(newPlayer("s", "C", "Cemetery Girl", 0).bonus, 0);
 });
 test("highest starting roll wins; one ready player cannot start", () => {
-  const s = makeRoom("ABC234", "s", "A", "Blaze");
+  const s = makeRoom("ABC234", "s", "A", "Digital Duke");
   assert.throws(() => applyAction(s, s.host, { type: "start" }), /two ready/);
   const q = newPlayer("b", "B", "Double A", 1);
   s.players.push(q);
@@ -286,8 +286,8 @@ test("both natural 10s tie regardless of bonuses", () => {
   assert.equal(s.phase, "end");
   assert.equal(s.penalty, null);
 });
-test("Blaze combat 9 is treated as 10", () => {
-  const s = game(["Blaze", "Mack Benjamin"]),
+test("Digital Duke combat 9 is treated as 10", () => {
+  const s = game(["Digital Duke", "Mack Benjamin"]),
     [p, q] = s.players;
   q.bonus = 100;
   fight(s, p, q, [9, 8]);
@@ -548,7 +548,7 @@ test("legacy rooms are readable but cannot be changed into mixed rules", () => {
 
 test("removed characters cannot be created or selected through lobby actions", () => {
   const s = makeRoom("ABC234", "s0", "First", "Violent J");
-  for (const name of ["Jamie Madrox", "Monoxide"]) {
+  for (const name of ["Jamie Madrox", "Monoxide", "Blaze"]) {
     assert.ok(!CHARACTERS.includes(name));
     assert.throws(() => newPlayer("s1", "Guest", name, 1), /available roster/);
     assert.throws(() => applyAction(s, s.host, {type: "character", character: name}), /available roster/);
@@ -556,11 +556,11 @@ test("removed characters cannot be created or selected through lobby actions", (
   }
   while (s.players.length < 6) applyAction(s, s.host, {type: "add-bot"});
   assert.ok(s.players.every(p => CHARACTERS.includes(p.character)));
-  assert.equal(publicState(s, "s0").coverage.characters, 16);
+  assert.equal(publicState(s, "s0").coverage.characters, 18);
 });
 
 test("saved seats using retired character rules still reconnect", () => {
-  for (const name of ["Jamie Madrox", "Monoxide"]) {
+  for (const name of ["Jamie Madrox", "Monoxide", "Blaze"]) {
     const s = game();
     s.players[0].character = name;
     const view = publicState(s, "s0");

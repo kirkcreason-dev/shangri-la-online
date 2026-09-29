@@ -2159,7 +2159,7 @@ function prepareMovement(
           region: q.region,
           pos: q.pos,
           toll: 0,
-          reason: "Monoxide",
+          reason: "Visit another player",
         });
   }
   s.choices = [

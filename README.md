@@ -2,13 +2,13 @@
 
 The official multiplayer beta of The Quest for Shangri-La. Play together online with shared rooms, saved turns, and room chat. Visual fidelity and support for every physical-game interaction are still in progress.
 
-[Play the online beta](https://kirkcreason-dev.github.io/shangri-la-online/) · [Alternate game address](https://shangri-la-table.y9sph6ffvj.chatgpt.site/)
+[Play the online beta](https://kirkcreason-dev.github.io/shangri-la-online/)
 
 ## Corrected rules edition
 
 New tables use version 3. Existing prototype rooms remain readable and are preserved; they cannot be converted into a mix of incompatible rule sets.
 
-- All 16 playable character records use researched starting Life, Combat Bonus, Cash, allegiance, location, equipment, and paraphrased power descriptions.
+- All 18 playable character records use researched starting Life, Combat Bonus, Cash, allegiance, location, equipment, and paraphrased power descriptions.
 - All 60 board spaces have audited effects. The Pipeline costs $100 inward. The Portal costs one Item inward. Magic Ninja waives tolls; Shangri-La still requires 15 base Combat Bonus.
 - The recovered Action decks contain 101 Detroit, 90 Nethervoid, and 69 Dark Carnival component records. Names, numbers and mechanical summaries replace the invented 48-card prototype deck.
 - The Purchase supply contains 40 Item cards representing 14 types. Thirteen Bone cards are included. Cash objects found in the community Purchase stack are excluded from the shop supply.
@@ -16,7 +16,7 @@ New tables use version 3. Existing prototype rooms remain readable and are prese
 - Item inventories, Homies, Purchase stock, trade offers requiring acceptance, first-death replacement characters, and all ten ending structures are represented.
 - New rooms can be saved in Firebase Firestore; existing rooms remain in D1. Browser sessions identify seats, spectators cannot act, and revision checks reject concurrent stale writes. Deck order and unrevealed endings stay on the server.
 
-Jamie Madrox and Monoxide are excluded from the playable roster, practice opponents, and replacement-character draws. Existing saved seats retain their rules so ongoing games can continue.
+Blaze, Jamie Madrox, and Monoxide are excluded from new seats, practice opponents, and replacement draws. Digital Duke inherits Blaze’s complete set; Nocturnal Deadhead inherits Jamie Madrox’s; 3 ZEE inherits Monoxide’s. These are edition-specific character names, not additional recovered retail components. Existing saved seats retain their rules so ongoing games can continue.
 
 ## Table controls and remaining fidelity limits
 
@@ -30,7 +30,9 @@ Timing conventions are visible in the rules panel: timed Bones count future full
 
 The community inventory repeats a 19-card Detroit atlas. Three Detroit title readings remain uncertain. Page 1 of the scanned rulebook lists 110 Detroit, 90 Nethervoid, 70 Dark Carnival, 42 Purchase and 13 Bone cards. The recovered records therefore fall short, and their identities/copy counts have not been certified against a complete physical retail set. Starting equipment is allocated from this observed finite supply; combinations exhausting it are rejected rather than manufacturing cards. Card artwork is not reproduced. The board photograph retains glare and cropping. Online rooms are publicly accessible by invitation link.
 
-## Board controls
+## Board display and controls
+
+The enhanced board preserves all 60 mapped spaces and their original tile artwork, with individual frames, readable labels, and a newly drawn center. Original view retains the reference photograph. Select any space to read its rules; search or use region shortcuts to find it. Legal destinations preview their rules and tolls before a separate Move button commits the move. View and label preferences persist on this device. Expand opens a focused board view; Escape closes it.
 
 The board follows your piece, pans and pivots as you move, and frames your legal destinations. Use Follow turn to watch the active player, Full board for the overview, or drag to explore. Rotate with the arrow buttons or Shift-drag; use the zoom buttons or pinch and twist with two fingers. The minimap keeps your place visible. Keyboard controls work with the board focused: arrows pan, +/− zoom, [/] rotate, and Home returns to your piece. Movement effects respect reduced-motion settings.
 

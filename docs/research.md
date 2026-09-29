@@ -26,7 +26,7 @@ Three Detroit title readings remain provisional: the Homie at source card 3300 a
 
 The character photograph reads Mack Benjamin, while the rulebook contents list Hack Benjamin. The game retains the photographed record name. This is a source disagreement, not simply a mistaken secondary listing.
 
-All 60 board spaces (28 Detroit, 20 Nethervoid, 12 Dark Carnival) and all 18 original character records have been mapped. The current playable roster contains 16 characters after the requested removal of Jamie Madrox and Monoxide. The board photograph has glare and edge cropping. Card artwork is not reproduced. Mechanical summaries are newly worded; verification against the complete physical game remains in progress.
+All 60 board spaces (28 Detroit, 20 Nethervoid, 12 Dark Carnival) and all 18 original character records have been mapped. The current playable roster contains 18 characters. Digital Duke, Nocturnal Deadhead, and 3 ZEE replace Blaze, Jamie Madrox, and Monoxide respectively, inheriting their complete rules sets at the owner’s request. These new names are specific to this edition. The board photograph has glare and edge cropping. The enhanced display uses its tile artwork in the same mapped positions, with new vector frames, labels, and center art; Original view retains the photograph. This is a presentation rebuild, not newly recovered retail art. Card artwork is not reproduced. Mechanical summaries are newly worded; verification against the complete physical game remains in progress.
 
 ## Implemented timing conventions
 

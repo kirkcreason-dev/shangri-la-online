@@ -44,7 +44,7 @@ export function tableGuidance(room: GuideRoom) {
     ? room.options.find(o => o.action.type === room.phase && !o.action.choice) : undefined;
   const hints: Record<string, [string, string]> = {
     roll: ["Ready to roll", "Use any start-of-turn powers, then roll for movement."],
-    move: ["Choose your destination", "Tap a glowing space. Crossing a gate may require a toll."],
+    move: ["Choose your destination", "Tap a glowing space to preview its rules and toll, then press Move to confirm."],
     encounter: ["Resolve your encounter", "Open Controls for the space, card, or opponent you landed on."],
     end: ["Wrap up your turn", "Finish any optional shopping or trades, then end your turn."],
     overflow: ["Your inventory is full", "Choose an Item to discard in Controls."],
