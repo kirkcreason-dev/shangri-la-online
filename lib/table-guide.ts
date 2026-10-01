@@ -11,7 +11,7 @@ export function tableGuidance(room: GuideRoom) {
   const active = room.players[room.turn];
   const own = room.players.find(p => p.id === room.me);
   const controlled = room.players.find(p => p.id === room.control);
-  const result = (title: string, detail: string, attention = false, quick?: Option) => ({title, detail, attention, quick});
+  const result = (title: string, detail: string, attention = false, quick?: Option, target = "table-controls") => ({title, detail, attention, quick, target});
   if (room.legacy) return result("Saved table", "Open a new table to use the current rules.");
   if (room.status === "finished") return result(room.endedByHost ? "Game ended by the host" : "Quest complete", "Your final board and game history are saved.");
   if (room.status === "lobby") {
@@ -23,20 +23,20 @@ export function tableGuidance(room: GuideRoom) {
   if (response) {
     const player = room.players.find(p => p.id === response);
     const yours = response === room.control || player?.controller === room.me;
-    return result(yours ? "Your choice is needed" : `Waiting for ${player?.name ?? "a player"}`, "Resolve the card response in Controls to continue.", yours);
+    return result(yours ? "Your choice is needed" : `Waiting for ${player?.name ?? "a player"}`, yours ? "Open your choices and select a card to continue." : "Their card choice is needed before the turn can continue.", yours);
   }
   if (room.phase === "waiting") return result("Table paused", "A temporary absence timer is running. The game resumes automatically.");
   if (room.combat) {
     const participant = controlled && [room.combat.attacker, room.combat.defender].includes(controlled.id);
     const choosing = !!participant && !room.combat.choices[controlled.id];
-    return result(choosing ? "Choose your combat equipment" : "Combat in progress", choosing ? "Pick your weapon and any optional effects in Controls." : "Waiting for combat choices to resolve.", choosing);
+    return result(choosing ? "Choose your combat equipment" : "Combat in progress", choosing ? "Pick a weapon or fight unarmed, then confirm your equipment." : participant ? "Your equipment is locked in. Waiting for the other combat choice." : "The combatants are choosing their equipment.", choosing);
   }
   const resolving = room.decision?.actor ?? room.overflow?.player ?? room.penalty?.winner ?? room.ruling?.actor;
   if (resolving) {
     const player = room.players.find(p => p.id === resolving);
     const yours = resolving === room.control || player?.controller === room.me;
     const label = room.overflow ? "Choose an Item to discard" : room.penalty ? "Choose the combat reward" : room.ruling ? "Resolve the card effect" : "Your decision is needed";
-    return result(yours ? label : `Waiting for ${player?.name ?? "a player"}`, "Open Controls to resolve the pending effect.", yours);
+    return result(yours ? label : `Waiting for ${player?.name ?? "a player"}`, yours ? "Open your choices to finish this effect and continue." : "Their choice is needed before the turn can continue.", yours);
   }
   if (controlled?.id !== active?.id) return result(`Waiting for ${active?.name ?? "the active player"}`, "You can inspect the board, check your cards, or chat.");
   const prompt = room.decision || room.overflow || room.ruling;
@@ -54,5 +54,5 @@ export function tableGuidance(room: GuideRoom) {
     ending: ["Face the final challenge", "Resolve the revealed ending in Controls."],
   };
   const [title, detail] = hints[room.phase] ?? ["Your move", "Choose an available action in Controls."];
-  return result(controlled?.bot ? `Practice opponent · ${title}` : title, detail, true, quick);
+  return result(controlled?.bot ? `Practice opponent · ${title}` : title, detail, true, quick, room.phase === "move" ? "available-destinations" : "table-controls");
 }

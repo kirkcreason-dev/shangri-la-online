@@ -43,3 +43,16 @@ test('out-of-turn winners and inventory owners receive the right guidance',()=>{
  delete s.penalty;s.phase='overflow';s.overflow={player:'a'};
  assert.equal(tableGuidance(s).attention,false);assert.match(tableGuidance(s).title,/Alice/);
 });
+
+test('movement shortcuts point to destinations, but pending responses still point to choices',()=>{
+ const s=room();s.phase='move';s.options=[];
+ assert.equal(tableGuidance(s).target,'available-destinations');
+ s.itemPrompt={player:'a'};
+ assert.equal(tableGuidance(s).target,'table-controls');assert.equal(tableGuidance(s).attention,true);
+ delete s.itemPrompt;s.pendingCard={player:'b'};
+ assert.equal(tableGuidance(s).target,'table-controls');assert.equal(tableGuidance(s).attention,false);
+});
+test('finished and departed seats cannot receive a playable shortcut',()=>{
+ const s=room();s.status='finished';assert.equal(tableGuidance(s).quick,undefined);
+ s.status='playing';s.players[0].left=true;assert.equal(tableGuidance(s).attention,false);assert.equal(tableGuidance(s).quick,undefined);
+});

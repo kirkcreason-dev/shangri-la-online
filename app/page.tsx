@@ -11,8 +11,9 @@ import {
   character as characterRecord,
 } from "@/lib/rules/catalog";
 import { ChoiceCard, CardSelect } from '@/components/game/ChoiceCards';
+import { TableDock, QuestProgress } from '@/components/game/TableDock';
 import { TableActivity } from '@/components/game/TableActivity';
-import { StartGame, GameLobby } from '@/components/game/StartGame';
+import { StartGame, GameLobby, SavedTables } from '@/components/game/StartGame';
 import { LearnToPlay } from "@/components/game/LearnToPlay";
 import { TableGuide, jumpToTableSection } from "@/components/game/TableGuide";
 import { tableGuidance } from "@/lib/table-guide";
@@ -751,8 +752,8 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (!preferencesLoaded) return;
-    try { localStorage.setItem("qsl_tables", JSON.stringify(recent)); localStorage.setItem("qsl_character", character); } catch {}
-  }, [recent, character, preferencesLoaded]);
+    try { localStorage.setItem("qsl_tables", JSON.stringify(recent)); localStorage.setItem("qsl_character", character); localStorage.setItem("qsl_name", name); } catch {}
+  }, [recent, character, name, preferencesLoaded]);
   useEffect(() => {
     if (!room?.me) return;
     const seat = room.players.find(p => p.id === room.me);
@@ -790,6 +791,11 @@ export default function Home() {
       document.removeEventListener("visibilitychange", load);
     };
   }, [code, update, refreshKey]);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(""), 6000);
+    return () => clearTimeout(timer);
+  }, [toast]);
   function remember(c: string) {
     try { localStorage.setItem("qsl_name", name); } catch {}
     window.history.replaceState({}, "", gameInvite(c));
@@ -983,8 +989,16 @@ export default function Home() {
           </button>
         </div>
       </header>
-      {!room&&!code&&<StartGame name={name} setName={setName} character={character} setCharacter={setCharacter} code={joinCode} setCode={setJoinCode} busy={busy} offline={offline} onStart={(join,practice)=>void enter(join,practice)} onLearn={()=>setLearning(true)} error={error}/>}
+          {(connection || offline || (code && !room)) && (
+            <div className={connection || offline ? "error connection-banner" : "connection-banner"} role="status">
+              <span>{offline ? "You’re offline. Your table is saved." : connection || "Opening your saved table…"}</span>
+              {code && <div><button className="quiet" disabled={offline || busy} onClick={() => setRefreshKey(k => k + 1)}>Reconnect</button><button className="quiet" disabled={busy} onClick={closeView}>Back to tables</button></div>}
+            </div>
+          )}
+      {!room&&!code&&<StartGame name={name} setName={setName} character={character} setCharacter={setCharacter} code={joinCode} setCode={setJoinCode} busy={busy} offline={offline} onStart={(join,practice)=>void enter(join,practice)} onLearn={()=>setLearning(true)} savedGames={<SavedTables tables={recent} busy={busy||offline} onOpen={reopen} onForget={c=>setRecent(old=>old.filter(t=>t.code!==c))}/> }/>}
       {room?.status==='lobby'&&me&&<GameLobby code={room.code} players={room.players} me={me.id} host={room.host} busy={busy} offline={offline} onReady={()=>action({type:'ready'})} onStart={()=>action({type:'start'})} onPractice={()=>action({type:'start-practice'})} onInvite={copy}/>}
+      {inviteFallback&&<label className="invite-fallback invite-global">Copy this invite link<input readOnly value={inviteFallback} onFocus={e=>e.currentTarget.select()}/><small>Or share room code {room?.code}.</small></label>}
+      <div className="table-feedback" aria-label="Game messages">{error&&<div className="error" role="alert"><span>{error}</span><button className="quiet" onClick={()=>setError('')} aria-label="Dismiss error">×</button></div>}{toast&&<div className="toast" role="status">{toast}</div>}</div>
       <div className={"game-layout " + (room ? "playing" : "home-preview") + (room&&!me?' needs-seat':'')}>
         <section className="table" id="table-board" tabIndex={-1}>
           <div className="table-heading">
@@ -1014,12 +1028,6 @@ export default function Home() {
               {room ? `${room.players.length}/6 seated` : "2–6 players"}
             </span>
           </div>
-          {(connection || offline || (code && !room)) && (
-            <div className={connection || offline ? "error connection-banner" : "connection-banner"} role="status">
-              <span>{offline ? "You’re offline. Your table is saved." : connection || "Opening your saved table…"}</span>
-              {code && <div><button className="quiet" disabled={offline || busy} onClick={() => setRefreshKey(k => k + 1)}>Reconnect</button><button className="quiet" disabled={busy} onClick={closeView}>Back to tables</button></div>}
-            </div>
-          )}
           {room && guide && room.status === "playing" && !room.legacy && <TableGuide guide={guide} phase={room.phase} stats={me} busy={busy} offline={offline} onAction={action} connection={offline ? "OFFLINE" : connection ? "RECONNECTING" : "LIVE TABLE · SAVED AUTOMATICALLY"} />}
           {room?.status==='playing'&&<TableActivity roomCode={room.code} moments={room.activity} rolling={rolling}/>}
           {me?.left&&<div className="game-ended-banner"><strong>You left this match.</strong><p>You can watch the remaining players, or start a new game.</p><button className="primary" onClick={closeView}>Back to play menu</button></div>}
@@ -1158,11 +1166,6 @@ export default function Home() {
           )}
         </section>
         <aside className="sidebar" id="table-controls" tabIndex={-1}>
-          {error && (
-            <div className="error" role="alert">
-              {error}
-            </div>
-          )}
           {room && !me && !room.legacy && (
             <section className="panel join-panel">
               <span className="eyebrow">TAKE A SEAT</span>
@@ -1243,12 +1246,6 @@ export default function Home() {
                   Copy invite
                 </button>
               </div>
-              {toast && (
-                <p className="toast" role="status">
-                  {toast}
-                </p>
-              )}
-              {inviteFallback && <label className="invite-fallback">Invite link<input readOnly value={inviteFallback} onFocus={e => e.currentTarget.select()} /></label>}
               {room.status === "lobby" ? (
                 <>
                   <details className="lobby-character"><summary>Change your character · {me.character}</summary><CardSelect aria-label="Your character" value={me.character} disabled={busy||offline} onChange={e=>action({type:'character',character:e.target.value})}>{CHARACTERS.map(c=><option key={c} disabled={room.players.some(p=>p.id!==me.id&&p.character===c)}>{c}</option>)}</CardSelect></details>
@@ -1442,7 +1439,7 @@ export default function Home() {
             </section>
           )}
           {room && p && !room.legacy && (
-            <section className="panel">
+            <section className="panel" id="table-character" tabIndex={-1}>
               <span className="eyebrow">
                 {p.bot
                   ? "PRACTICE OPPONENT"
@@ -1451,6 +1448,7 @@ export default function Home() {
                     : `${p.name.toUpperCase()} · YOU CONTROL THIS TURN`}
               </span>
               <h2>{p.character}</h2>
+              <QuestProgress bonus={p.bonus} region={p.region} dead={p.dead} ending={room.ending?.name}/>
               {p.absentUntil && (
                 <p className="notice" role="status">
                   King High Bone: you return in{" "}
@@ -1574,20 +1572,6 @@ export default function Home() {
               </ul>
             </section>
           )}
-          {!room && recent.length > 0 && (
-            <section className="panel">
-              <h3>Return to a table</h3>
-              <div className="recent-tables">
-                {recent.map(t => <div className="recent-table" key={t.code}>
-                  <button className="recent-table-open" disabled={busy || offline} onClick={() => reopen(t.code)}>
-                    <strong>{t.code}<span>{t.status === "finished" ? "Finished" : t.status === "playing" ? `Round ${t.round ?? 1}` : "Table"}</span></strong>
-                    <span>{t.character ?? "Resume your saved seat"}{t.players ? ` · ${t.players} players` : ""}</span>
-                  </button>
-                  <button className="quiet forget-table" aria-label={`Forget table ${t.code}`} title="Remove from this device’s recent tables" onClick={() => setRecent(old => old.filter(x => x.code !== t.code))}>×</button>
-                </div>)}
-              </div>
-            </section>
-          )}
           <section className="panel edition-panel">
             <span className="eyebrow">ABOUT THIS EDITION</span>
             <p className="small">
@@ -1607,11 +1591,7 @@ export default function Home() {
           </section>
         </aside>
       </div>
-      {room && <nav className="table-mobile-nav" aria-label="Jump around your table">
-        <button onClick={() => jumpToTableSection("table-board")}>◇ Board</button>
-        <button className={guide?.attention ? "needs-you" : ""} onClick={() => jumpToTableSection("table-controls")}>{guide?.attention ? "● Your action" : "Controls"}</button>
-        <button onClick={() => jumpToTableSection("table-chat")}>Chat</button>
-      </nav>}
+      {room&&guide&&!room.legacy&&<TableDock guide={guide} busy={busy} offline={offline} reconnecting={!!connection} hasCards={!!p&&!room.legacy} onAction={action}/>}
       <LearnToPlay open={learning} onClose={() => setLearning(false)} onComplete={() => setLearned(true)} current={room && guide ? {...guide, phase: room.phase} : undefined}/>
       <dialog ref={endDialog} className="quit-dialog" aria-labelledby="end-game-title" onCancel={e => {if(busy)e.preventDefault();}}>
         <div className="modal">
