@@ -1,4 +1,5 @@
 "use client";
+import { GameArtwork } from './GameArtwork';
 import type { Action } from '@/lib/rules/types';
 import type { tableGuidance } from '@/lib/table-guide';
 import { jumpToTableSection } from './TableGuide';
@@ -8,7 +9,7 @@ export function TableDock({guide,busy,offline,reconnecting,hasCards=false,onActi
   const label=busy?'Saving…':guide.quick?.label??(movement?'Choose destination':guide.attention?'Open my choices':'Table details');
   return <nav className="table-dock" aria-label="Table shortcuts">
     <div className="dock-status"><span>{offline?'OFFLINE':reconnecting?'RECONNECTING':guide.attention?'YOUR NEXT STEP':'AT THE TABLE'}</span><strong>{guide.title}</strong></div>
-    <div className="dock-links"><button onClick={()=>jumpToTableSection('table-board')}>◇ Board</button>{hasCards&&<button onClick={()=>jumpToTableSection('table-character')}>My cards</button>}<button onClick={()=>jumpToTableSection('table-chat')}>Chat</button></div>
+    <div className="dock-links"><button onClick={()=>jumpToTableSection('table-board')}><GameArtwork kind="move"/>Board</button>{hasCards&&<button onClick={()=>jumpToTableSection('table-character')}><GameArtwork kind="power"/>My cards</button>}<button onClick={()=>jumpToTableSection('table-chat')}><GameArtwork kind="character"/>Chat</button></div>
     <button className={guide.attention?'primary dock-action':'secondary dock-action'} disabled={busy||!!guide.quick&&(offline||reconnecting)} onClick={()=>guide.quick?onAction(guide.quick.action):jumpToTableSection(guide.target)}>{label}{!guide.quick?' ↑':''}</button>
   </nav>;
 }

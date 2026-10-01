@@ -3,10 +3,11 @@ import type { ReactNode } from 'react';
 import type { RecentTable } from '@/lib/table-preferences';
 import { gameAsset } from '@/lib/client-connection';
 import { CHARACTERS } from '@/lib/rules/catalog';
+import { GameArtwork } from './GameArtwork';
 import { CardSelect, ChoiceFace } from './ChoiceCards';
 export function StartGame({name,setName,character,setCharacter,code,setCode,busy,offline,onStart,onLearn,savedGames}:{name:string;setName:(s:string)=>void;character:string;setCharacter:(s:string)=>void;code:string;setCode:(s:string)=>void;busy:boolean;offline:boolean;onStart:(join:boolean,practice?:boolean)=>void;onLearn:()=>void;savedGames?:ReactNode}){
   return <section className="start-game" aria-label="Start playing">
-    <div className="intro-brand"><img src={gameAsset('creasonorse-logo.png')} alt="CREASO·NORSE" width={444} height={90}/><span>PRESENTS</span></div><div className="start-heading"><span className="eyebrow">THE QUEST STARTS HERE</span><h1>Pick a way to play.</h1><p>Build your strength, gather your crew, and reach Shangri-La.</p></div>
+    <div className="intro-brand"><img src={gameAsset('creasonorse-logo.png')} alt="CREASO·NORSE" width={444} height={90}/><span>PRESENTS</span></div><div className="start-heading"><div><span className="eyebrow">THE QUEST STARTS HERE</span><h1>Pick a way to play.</h1><p>Build your strength, gather your crew, and reach Shangri-La.</p></div><GameArtwork kind="carnival" className="intro-carnival"/></div>
     {savedGames}<div className="start-identity"><label>Your name <input value={name} onChange={e=>setName(e.target.value)} maxLength={24} placeholder="Player" autoComplete="nickname"/></label><details className="start-character"><summary><span>YOUR CHARACTER</span><strong>{character}</strong><small>Change character ▾</small></summary><CardSelect aria-label="Character" value={character} onChange={e=>setCharacter(e.target.value)}>{CHARACTERS.map(c=><option key={c}>{c}</option>)}</CardSelect></details></div>
     <div className="start-modes">
       <button className="choice-card start-now" disabled={busy||offline} onClick={()=>onStart(false,true)}><ChoiceFace label="Play now" value="roll"/><span className="start-description">Start instantly with a practice opponent. No invite needed.</span><span className="choice-foot">{busy?'Opening game…':'Start playing →'}</span></button>

@@ -38,12 +38,12 @@ export function BoardArtwork({ id, rotation, labels, original }: { id: string; r
       const lines=labelLines(s.name);
       return <g key={`${s.region}:${s.pos}`} className="board-upright board-tile-label" style={{transform:`translate(${s.column*100+50}px, ${s.row*100+50}px) rotate(${-rotation}deg)`}}>
         <rect x="-44" y={28-lines.length*11} width="88" height={lines.length*11+7} rx="3" fill="#100e17" fillOpacity=".92" stroke={REGION_INKS[s.region]} strokeOpacity=".45" strokeWidth=".65"/>
-        {lines.map((line,i)=><text key={i} x="0" y={38-lines.length*11+i*11} textAnchor="middle" fill="#fff2dc" fontSize="10" fontWeight="600" fontFamily="Georgia, serif">{line}</text>)}
+        {lines.map((line,i)=><text key={i} x="0" y={38-lines.length*11+i*11} textAnchor="middle" fill="#fff2dc" fontSize="10" fontWeight="400" fontFamily="Bangers, Impact, sans-serif">{line}</text>)}
       </g>;
     })}
     {!original && <g className="board-upright" style={{transform:`translate(400px,400px) rotate(${-rotation}deg)`}}>
       <text y="-38" textAnchor="middle" fill="#cdb180" fontSize="7" letterSpacing="2.1">THE QUEST FOR</text>
-      <text y="-4" textAnchor="middle" fill="#ffedb8" fontSize="26" fontFamily="Georgia,serif">Shangri-La</text>
+      <text y="-4" textAnchor="middle" fill="#ffedb8" fontSize="26" fontFamily="Bangers, Impact, sans-serif">Shangri-La</text>
       <path d="M-55 11H-10M10 11H55M0 7 4 11 0 15-4 11Z" fill="none" stroke="#c8a469" strokeWidth=".7"/>
       <text y="33" textAnchor="middle" fill="#d6c2a0" fontSize="7" letterSpacing="1.4">BEYOND THE DARK CARNIVAL</text>
       <text y="48" textAnchor="middle" fill="#f0dbab" fontSize="8">15+ BASE COMBAT BONUS</text>

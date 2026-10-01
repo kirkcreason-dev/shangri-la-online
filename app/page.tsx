@@ -10,6 +10,7 @@ import {
   cardName,
   character as characterRecord,
 } from "@/lib/rules/catalog";
+import { GameArtwork } from '@/components/game/GameArtwork';
 import { ChoiceCard, CardSelect } from '@/components/game/ChoiceCards';
 import { TableDock, QuestProgress } from '@/components/game/TableDock';
 import { TableActivity } from '@/components/game/TableActivity';
@@ -89,6 +90,7 @@ function CardView({ id, onUse }: { id: string; onUse?: (id: string) => void }) {
           </span>
         )}
       </div>
+      <div className={`card-illustration card-illustration-${c.kind}`}><GameArtwork kind={c.weapon?'weapon':c.use==='armor'?'armor':c.kind}/></div>
       <h3>{c.name}</h3>
       <p>{c.rules}</p>
       {!c.automatic && (
@@ -967,7 +969,7 @@ export default function Home() {
     return () => { document.title = "Shangri-La Online · Official Beta"; };
   }, [room?.code, guide?.attention]);
   return (
-    <main className={room ? "has-table" : ""}>
+    <main className={`board-game-art ${room ? "has-table" : ""}`}>
       <header className="topbar">
         <div className="wordmark">
           <span className="brand-mark">◇</span>

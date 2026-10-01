@@ -2,6 +2,7 @@
 import { Children, Fragment, isValidElement, useId, useState, type ReactNode, type SelectHTMLAttributes, type ChangeEvent } from 'react';
 import { Axe, Shield, Skull, Users, Footprints, Dices, Heart, Coins, Sparkles, DoorOpen, ArrowRight, Check, ShoppingBag, BookOpen } from 'lucide-react';
 import { CARDS, CHARACTERS } from '@/lib/rules/catalog';
+import { GameArtwork } from './GameArtwork';
 import { gameAsset } from '@/lib/client-connection';
 import { BOARD_SPACES } from '@/lib/board-display';
 import type { Option } from '@/lib/rules/types';
@@ -15,11 +16,11 @@ export function choiceLook(label:string,value='') {
   const kind=startKind??(tile?'location':undefined)??c?.kind??(CHARACTERS.includes(label)?'character':/roll|dice|die/.test(text)?'roll':/life|heal/.test(text)?'health':/\$|cash|buy|sell/.test(text)?'cash':/move|travel|teleport|detroit|nethervoid|carnival/.test(text)?'move':/end|leave|quit|pass|finish/.test(text)?'end':'power');
   const Icon=kind==='tutorial'?BookOpen:c?.weapon?Axe:c?.use==='armor'?Shield:kind==='fiend'?Skull:kind==='homie'||kind==='character'?Users:kind==='roll'?Dices:kind==='health'?Heart:kind==='cash'?Coins:kind==='move'||kind==='location'?Footprints:kind==='end'?DoorOpen:kind==='item'?ShoppingBag:Sparkles;
   const region=typeof c?.deck==='number'?c.deck:kind==='fiend'?1:kind==='cash'?0:2;
-  return {c,kind,Icon,region:tile?.region??region,tile};
+  return {c,kind,Icon,artKind:c?.weapon?'weapon':c?.use==='armor'?'armor':kind,region:tile?.region??region,tile};
 }
 export function ChoiceFace({label,value='',compact=false}:{label:string;value?:string;compact?:boolean}){
-  const {c,kind,Icon,region,tile}=choiceLook(label,value);
-  return <><span className={`choice-art region-${region}${compact?' compact':''}`} aria-hidden="true">{tile?<svg className="choice-tile" viewBox={`${tile.column*100} ${tile.row*100} 100 100`}><image href={gameAsset('board-reference.jpg')} width="800" height="800"/></svg>:<><img src={gameAsset('board-reference.jpg')} alt=""/><span className="choice-sigil"><Icon strokeWidth={1.3}/></span></>}<span className="choice-corner">✦</span></span><span className="choice-copy"><span className="choice-kind">{c?.weapon?'Weapon':kind==='power'?'Your choice':kind==='character'&&label==='Host online game'?'Online table':kind}</span><strong>{label}</strong>{c&&<span className="choice-badges">{!!c.combat&&<i>+{c.combat} combat</i>}{c.strength!==undefined&&<i>Strength {c.strength}</i>}{c.reward!==undefined&&<i>+{c.reward} CB reward</i>}</span>}</span></>;
+  const {c,kind,artKind,region,tile}=choiceLook(label,value);
+  return <><span className={`choice-art region-${region}${compact?' compact':''}`} aria-hidden="true">{tile?<svg className="choice-tile" viewBox={`${tile.column*100} ${tile.row*100} 100 100`}><image href={gameAsset('board-reference.jpg')} width="800" height="800"/></svg>:<GameArtwork kind={artKind}/>}<span className="choice-corner">✦</span></span><span className="choice-copy"><span className="choice-kind">{c?.weapon?'Weapon':kind==='power'?'Your choice':kind==='character'&&label==='Host online game'?'Online table':kind}</span><strong>{label}</strong>{c&&<span className="choice-badges">{!!c.combat&&<i>+{c.combat} combat</i>}{c.strength!==undefined&&<i>Strength {c.strength}</i>}{c.reward!==undefined&&<i>+{c.reward} CB reward</i>}</span>}</span></>;
 }
 export function ChoiceCard({option,disabled,onChoose}:{option:Option;disabled?:boolean;onChoose:()=>void}){
   const value=option.action.item??option.action.choice??'';
