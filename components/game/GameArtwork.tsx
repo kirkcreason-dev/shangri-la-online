@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
 
+export function cardArtwork(c:{weapon?:boolean;use?:string;vehicle?:boolean;kind:string}) {
+  return c.weapon?'weapon':c.use==='armor'?'armor':c.use==='drink'?'drink':c.use==='herb'?'herb':c.vehicle?'vehicle':c.kind;
+}
+
 // Printed, code-native artwork stays sharp on small cards and a zoomed board.
 export function GameArtwork({kind='power',className=''}:{kind?:string;className?:string}) {
   let art:ReactNode;
@@ -16,6 +20,9 @@ export function GameArtwork({kind='power',className=''}:{kind?:string;className?
       <path d="m64 75-20 25m8-34-17 28m105-19 20 25m-8-34 17 28" stroke="#ead3a2" strokeWidth="11"/>
       <path d="M73 33 51 9 58 43m69-10 22-24-7 34" fill="#d79964"/><path d="M65 33q35-28 70 0l6 30-13 24v20l-56 1V88L59 63Z" fill="#eed7a8"/><path d="m69 49 24 7-9 20-16-9m63-18-24 7 9 20 16-9M100 68l-8 15h16Z" fill="#342638"/><path d="M78 96h44m-34-7v17m12-17v17m12-17v17" fill="none"/>
     </>;break;
+    case 'drink': art=<><path d="M85 14h30v19l5 8q18 12 18 30v38q-2 11-38 11t-38-11V71q0-18 18-30l5-8Z" fill="#ac7066"/><path d="M81 11h38v13H81Z" fill="#e6c491"/><path d="M67 65h66v37H67Z" fill="#e4c994"/><path d="m100 69 5 10 12 2-9 8 2 12-10-6-10 6 2-12-9-8 12-2Z" fill="#956192"/><path d="M76 55q3-8 12-13m-13 67h15" fill="none" stroke="#e3a98e" strokeWidth="5"/></>;break;
+    case 'herb': art=<><path d="M99 113V47m0 40L67 64m32 5 33-29m-32 60 29-21" fill="none" stroke="#c5d08e" strokeWidth="6"/><path d="M96 65Q62 70 48 32q43-4 48 33Zm8 5q-2-44 41-52 0 42-41 52ZM95 99Q52 101 45 68q43-1 50 31Zm10 8q0-36 44-43-4 37-44 43Z" fill="#91ab78"/><path d="m61 42 24 17m52-28-24 30M57 78l29 15m51-16-24 20" fill="none" stroke="#c3ce8b" strokeWidth="2"/><path d="m83 107 34-1-4 13H86Z" fill="#b89367"/></>;break;
+    case 'vehicle': art=<><g transform="rotate(-16 100 70)"><path d="M35 75q-14-3-17-18l30 6h105l28-10q-1 22-25 28H47Z" fill="#bc735f"/><path d="M49 72h99" stroke="#e5c99c" strokeWidth="3"/><path d="M56 82v10m87-10v10"/><circle cx="56" cy="98" r="12" fill="#bfb298"/><circle cx="143" cy="98" r="12" fill="#bfb298"/><circle cx="56" cy="98" r="4" fill="#3d2d3b"/><circle cx="143" cy="98" r="4" fill="#3d2d3b"/><path d="m99 35 6 11 13 2-10 9-9-5-9 5-10-9 13-2Z" fill="#dfc691"/></g></>;break;
     case 'cash': art=<>
       <path d="m82 39-14-23 17 4 15-10 13 10 16-4-12 26q32 21 31 53-10 28-49 23-42 5-50-23-1-33 33-53Z" fill="#aaba76"/><path d="m80 39 39 2-3 9-34-3Z" fill="#edd196"/><path d="M113 61q-24-13-26 3-2 11 21 16 18 14-8 18l-13-5m13-37v49" fill="none" strokeWidth="5"/>
       {[30,50,153,170].map((x,i)=><g key={x}><ellipse cx={x} cy={105-i%2*9} rx="13" ry="7" fill="#a97746"/><ellipse cx={x} cy={100-i%2*9} rx="13" ry="7" fill="#efcb7e"/></g>)}

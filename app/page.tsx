@@ -10,7 +10,10 @@ import {
   cardName,
   character as characterRecord,
 } from "@/lib/rules/catalog";
-import { GameArtwork } from '@/components/game/GameArtwork';
+import { CardView } from "@/components/game/GameCard";
+import { InventoryTray } from "@/components/game/InventoryTray";
+import { FieldGuide } from "@/components/game/FieldGuide";
+import { ComfortSettings, useTableComfort } from "@/components/game/TableComfort";
 import { ChoiceCard, CardSelect } from '@/components/game/ChoiceCards';
 import { TableDock, QuestProgress } from '@/components/game/TableDock';
 import { TableActivity } from '@/components/game/TableActivity';
@@ -74,47 +77,6 @@ async function api(path: string, data?: unknown, signal?: AbortSignal) {
   const value = (await r.json().catch(() => { throw new Error("The table is temporarily unavailable. Please reconnect."); })) as PublicRoom & { error?: string };
   if (!r.ok) throw new Error(value.error ?? "The table could not be reached.");
   return value as PublicRoom;
-}
-function CardView({ id, onUse }: { id: string; onUse?: (id: string) => void }) {
-  const c = card(id);
-  return (
-    <article className="game-card">
-      <div className="row">
-        <span className="eyebrow">
-          {c.weapon ? "Weapon" : c.kind}
-          {c.allegiance ? ` · ${c.allegiance}` : ""}
-        </span>
-        {c.strength !== undefined && (
-          <span className="pill">
-            Strength {c.strength} · +{c.reward} CB
-          </span>
-        )}
-      </div>
-      <div className={`card-illustration card-illustration-${c.kind}`}><GameArtwork kind={c.weapon?'weapon':c.use==='armor'?'armor':c.kind}/></div>
-      <h3>{c.name}</h3>
-      <p>{c.rules}</p>
-      {!c.automatic && (
-        <span className="manual-label">
-          Apply special effects with table controls
-        </span>
-      )}
-      {!c.verified && (
-        <p className="small">Source uncertainty: {c.notes?.join(" ")}</p>
-      )}
-      <div className="row">
-        {onUse && !c.automatic && (
-          <button className="quiet" onClick={() => onUse(id)}>
-            Use / resolve effect
-          </button>
-        )}
-        {c.source && (
-          <a className="small" href={c.source} target="_blank" rel="noreferrer">
-            Source image ↗
-          </a>
-        )}
-      </div>
-    </article>
-  );
 }
 function CombatForm({
   room,
@@ -718,7 +680,6 @@ export default function Home() {
     [refreshKey, setRefreshKey] = useState(0),
     [inviteFallback, setInviteFallback] = useState(""),
     [tollItem, setTollItem] = useState(""),
-    [search, setSearch] = useState(""),
     [wager, setWager] = useState(0);
   const rules = useRef<HTMLDialogElement>(null),
     busyRef = useRef(false),
@@ -964,12 +925,13 @@ export default function Home() {
     }
   }
   const guide = room ? tableGuidance(room) : null;
+  const comfort = useTableComfort(room?.code, !!guide?.attention, rolling);
   useEffect(() => {
     document.title = room ? `${guide?.attention ? "Your move · " : ""}${room.code} · Shangri-La` : "Shangri-La Online · Official Beta";
     return () => { document.title = "Shangri-La Online · Official Beta"; };
   }, [room?.code, guide?.attention]);
   return (
-    <main className={`board-game-art ${room ? "has-table" : ""}`}>
+    <main className={`board-game-art ${room ? "has-table" : ""} ${comfort.preferences.largeText ? "large-reading" : ""} ${comfort.preferences.reduceMotion ? "reduce-motion" : ""}`}>
       <header className="topbar">
         <div className="wordmark">
           <span className="brand-mark">◇</span>
@@ -985,6 +947,7 @@ export default function Home() {
             </button>
           )}
           {room && host && !room.legacy && room.status !== "finished" && <button className="quiet end-game-trigger" disabled={busy || offline} onClick={() => {setEndError("");endDialog.current?.showModal();}}>End game</button>}
+          <ComfortSettings comfort={comfort}/>
           <button className="learn-trigger" onClick={() => setLearning(true)}>Learn to play</button>
           <button className="quiet" onClick={() => rules.current?.showModal()}>
             Rules & cards
@@ -1496,69 +1459,8 @@ export default function Home() {
                 )}
               </details>
               {p.notes && <p className="notice">{p.notes}</p>}
-              <h3>
-                Items · {p.items.length}/{p.capacity}
-              </h3>
-              {p.items.length === 0 && <p className="small">No Items.</p>}
-              {p.items.map((id) => (
-                <CardView
-                  key={id}
-                  id={id}
-                  onUse={
-                    canUse
-                      ? (id) =>
-                          action({
-                            type: "table-rule",
-                            item: id,
-                            reason: card(id).rules,
-                          })
-                      : undefined
-                  }
-                />
-              ))}
-              <h3>Homies · {p.homies.length}</h3>
-              {p.homies.map((id) => (
-                <CardView
-                  key={id}
-                  id={id}
-                  onUse={
-                    canUse
-                      ? (id) =>
-                          action({
-                            type: "table-rule",
-                            item: id,
-                            reason: card(id).rules,
-                          })
-                      : undefined
-                  }
-                />
-              ))}
-              {p.bones.length > 0 && <h3>Bone effects</h3>}
-              {p.conditionDetails?.map((c) => (
-                <p className="small" key={c.id}>
-                  {c.name}
-                  {c.turns !== null
-                    ? ` · ${c.turns} future turn(s) remaining`
-                    : ""}
-                  {c.branch ? ` · ${c.branch}` : ""}
-                </p>
-              ))}
-              {p.bones.map((id) => (
-                <CardView
-                  key={id}
-                  id={id}
-                  onUse={
-                    canUse
-                      ? (id) =>
-                          action({
-                            type: "table-rule",
-                            item: id,
-                            reason: card(id).rules,
-                          })
-                      : undefined
-                  }
-                />
-              ))}
+              <InventoryTray key={`${room.code}:${p.id}`} items={p.items} homies={p.homies} bones={p.bones} capacity={p.capacity} conditions={p.conditionDetails} onUse={canUse && !busy && !offline ? id => action({type:"table-rule",item:id,reason:card(id).rules}) : undefined}/>
+
             </section>
           )}
           {room && !room.legacy && (
@@ -1615,20 +1517,13 @@ export default function Home() {
           <div className="exit-choices"><button className="secondary" disabled={busy} onClick={()=>{quitDialog.current?.close();closeView();}}>Save my seat · go to menu</button>{room?.status!=='finished'&&me&&!me.left&&<button className="danger-button" disabled={busy||offline} onClick={async()=>{setLeaveError('');try{await act({type:'leave-game',actor:me.id});setRecent(old=>old.filter(t=>t.code!==room!.code));quitDialog.current?.close();closeView();}catch(e){setLeaveError((e as Error).message);}}}>{busy?'Leaving…':'Leave permanently'}</button>}<button autoFocus className="quiet" disabled={busy} onClick={()=>quitDialog.current?.close()}>Keep playing</button></div>
         </div>
       </dialog>
-      <dialog ref={rules} className="rules-dialog">
-        <div className="modal">
-          <div className="modal-head">
-            <h2>Rules & card library</h2>
-            <button className="quiet" onClick={() => rules.current?.close()}>
-              Close
-            </button>
-          </div>
+      <FieldGuide dialogRef={rules} onLearn={() => {rules.current?.close();setLearning(true);}}>
           <p className="notice">
             Official beta. Special card effects require players
             to apply the displayed rules using shared controls. Automatic rules
             do not cover every interaction.
           </p>
-          <button className="primary wide" onClick={() => {rules.current?.close();setLearning(true);}}>Play the beginner tutorial →</button>
+
           <h3>Playing a turn</h3>
           <ol>
             <li>
@@ -1661,7 +1556,7 @@ export default function Home() {
               slots. End the turn after resolving the encounter.
             </li>
           </ol>
-          <h3>What the game handles</h3>
+          <details className="guide-reference"><summary>Advanced rules & edition notes</summary><h3>What the game handles</h3>
           <p>
             Character starting stats and equipment, movement paths and tolls,
             ordinary combat, natural 1/10 results, weapon breakage, basic shops,
@@ -1715,44 +1610,8 @@ export default function Home() {
               </a>
             </li>
           </ul>
-          <h3>Card library</h3>
-          <label>
-            Find a card
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name or effect"
-            />
-          </label>
-          <p className="small">
-            {
-              CARDS.filter(
-                (c) =>
-                  c.deck !== "ending" &&
-                  `${c.name} ${c.rules}`
-                    .toLowerCase()
-                    .includes(search.toLowerCase()),
-              ).length
-            }{" "}
-            matching component records. Duplicate records reflect the source
-            inventory.
-          </p>
-          <div className="card-library">
-            {CARDS.filter(
-              (c) =>
-                c.deck !== "ending" &&
-                `${c.name} ${c.rules}`
-                  .toLowerCase()
-                  .includes(search.toLowerCase()),
-            )
-              .slice(0, 40)
-              .map((c) => (
-                <CardView key={c.key} id={c.key} />
-              ))}
-          </div>
-        </div>
-      </dialog>
+          </details>
+      </FieldGuide>
     </main>
   );
 }

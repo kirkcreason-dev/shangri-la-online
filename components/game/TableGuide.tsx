@@ -1,11 +1,12 @@
 "use client";
+import { prefersQuietMotion } from "@/lib/table-comfort";
 import { GameArtwork, StatToken } from './GameArtwork';
 import type { Action } from "@/lib/rules/types";
 import type { tableGuidance } from "@/lib/table-guide";
 export function jumpToTableSection(id: string) {
   const element = document.getElementById(id);
   if (!element) return;
-  element.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
+  element.scrollIntoView({behavior: prefersQuietMotion() ? "auto" : "smooth", block: "start"});
   element.focus({preventScroll: true});
 }
 export function TableGuide({guide, busy, offline, phase, stats, onAction, connection}: {

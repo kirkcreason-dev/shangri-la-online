@@ -1,4 +1,5 @@
 "use client";
+import { prefersQuietMotion } from "@/lib/table-comfort";
 import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { CardSelect, ChoiceFace } from './ChoiceCards';
 import { BoardArtwork } from "./BoardArtwork";
@@ -34,7 +35,7 @@ export default function Board({ players = [], choices = [], onMove, active, focu
   const [search, setSearch] = useState("");
   const [selection, setSelection] = useState<{at: BoardAddress; context: string} | null>(null);
   useEffect(() => {
-    if(selection) details.current?.scrollIntoView({block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+    if(selection) details.current?.scrollIntoView({block: 'nearest', behavior: prefersQuietMotion() ? 'instant' : 'smooth'});
   }, [selection]);
   const [tabStop, setTabStop] = useState("0:0");
   const context = destinationContext(turnKey, choices);

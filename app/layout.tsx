@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./game-art.css";
+import "./table-polish.css";
 
 export const metadata: Metadata = {
   title: "Shangri-La Online · Official Beta",
