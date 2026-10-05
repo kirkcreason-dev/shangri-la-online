@@ -124,6 +124,31 @@ export function newPlayer(
     boost: 0,
   };
 }
+export function joinRoom(s: State, session: string, name: string, requested: string): Player {
+  const existing = s.players.find(p => p.session === session);
+  if (existing) return existing;
+  need(s.rulesVersion === 3, "Create a new table to use the corrected rules.");
+  need(s.status !== "finished", "This game has ended. Create a new table to play together.");
+  need(s.players.length < 6, "This table is full. Create another table to play together.");
+  const available = CHARACTERS.filter(c => !s.players.some(p => p.character === c) && !(s.usedCharacters ?? []).includes(c));
+  const selected = available.includes(requested) ? requested : available[0];
+  need(selected, "No characters are available at this table. Create a new table.");
+  const p = newPlayer(session, name, selected, s.players.length);
+  if (s.status === "playing") {
+    const stock = [...s.purchase];
+    const equipment = character(selected).startingItems.map(name => {
+      const index = stock.findIndex(id => cardName(id).toLowerCase() === name.toLowerCase());
+      need(index >= 0, `Starting equipment (${name}) is unavailable. Choose another character.`);
+      return stock.splice(index, 1)[0];
+    });
+    s.purchase = stock;
+    p.items = equipment;
+    p.ready = true;
+  }
+  s.players.push(p);
+  addLog(s, s.status === "playing" ? `${name} joined the ongoing game. Their turn follows the table order.` : `${name} joined the table.`);
+  return p;
+}
 export function makeRoom(
   code: string,
   session: string,

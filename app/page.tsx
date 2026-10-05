@@ -1135,6 +1135,8 @@ export default function Home() {
             <section className="panel join-panel">
               <span className="eyebrow">TAKE A SEAT</span>
               <h2>Join this table.</h2>
+              <p>{room.status === 'finished' ? 'This game has ended. Start a new table to play together.' : room.players.length >= 6 ? 'All six seats are taken. Start another table or stay and watch.' : room.status === 'playing' ? 'The game is underway—you can still join! Enter with your character’s starting gear and take your turn in table order.' : 'Choose your name and join. The host starts once everyone is ready.'}</p>
+              {(room.status === 'finished' || room.players.length >= 6) && <button className="primary" onClick={closeView}>Start a new table →</button>}
               <form
                 className="stack"
                 onSubmit={(e) => {
@@ -1152,7 +1154,7 @@ export default function Home() {
                     autoComplete="nickname"
                   />
                 </label>
-                <button className="primary" disabled={busy||offline||room.status!=='lobby'}>{busy?'Joining…':'Join this game →'}</button>
+                <button className="primary" disabled={busy||offline||room.status==='finished'||room.players.length>=6}>{busy?'Joining…':'Join this game →'}</button>
                 <details><summary>Optional · change character ({character})</summary>                <label>
                   Character
                   <CardSelect aria-label="Character"
