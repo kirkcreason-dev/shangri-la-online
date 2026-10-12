@@ -24,7 +24,7 @@ export function ChoiceFace({label,value='',compact=false,characterChoice=false}:
 }
 export function ChoiceCard({option,disabled,onChoose}:{option:Option;disabled?:boolean;onChoose:()=>void}){
   const value=option.action.item??option.action.choice??'';
-  return <button type="button" className="choice-card" aria-label={option.label} disabled={disabled} onClick={onChoose}><ChoiceFace label={option.label} value={value}/><span className="choice-foot">Choose <ArrowRight size={14}/></span></button>;
+  return <button type="button" className="choice-card" aria-label={option.label} disabled={disabled} onClick={onChoose}><ChoiceFace label={option.label} value={value}/><span className="choice-foot">{option.action.type === 'roll' ? 'Roll movement dice' : option.action.type === 'end' ? 'Pass to the next player' : option.action.type === 'move' ? 'Confirm this destination' : option.action.type === 'encounter' || option.action.type === 'resolve' ? 'Resolve this encounter' : 'Use this choice'} <ArrowRight size={14}/></span></button>;
 }
 type Entry={value:string;label:string;disabled:boolean};
 function entries(children:ReactNode):Entry[]{return Children.toArray(children).flatMap(child=>{

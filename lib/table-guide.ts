@@ -45,9 +45,9 @@ export function tableGuidance(room: GuideRoom) {
   const hints: Record<string, [string, string]> = {
     roll: ["Ready to roll", "Use any start-of-turn powers, then roll for movement."],
     move: ["Choose your destination", "Tap a glowing space to preview its rules and toll, then press Move to confirm."],
-    encounter: ["Resolve your encounter", "Open Controls for the space, card, or opponent you landed on."],
-    end: ["Wrap up your turn", "Finish any optional shopping or trades, then end your turn."],
-    overflow: ["Your inventory is full", "Choose an Item to discard in Controls."],
+    encounter: ["Resolve your encounter", "Resolve the space or card you landed on. Use the main action below; any further choices appear in the table controls."],
+    end: ["Wrap up your turn", "Shopping and trades are optional. If you are finished, press End turn to pass play to the next player."],
+    overflow: ["Your inventory is full", "You have too many Items. Choose one to give up before continuing."],
     ruling: ["Resolve the card effect", "Apply the displayed rules, then finish the ruling in Controls."],
     penalty: ["Choose the combat reward", "Select the winner’s reward or penalty in Controls."],
     decision: ["A decision is waiting", "Choose how to resolve the effect in Controls."],
