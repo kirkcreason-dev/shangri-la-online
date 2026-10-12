@@ -1,0 +1,13 @@
+.combat-workbench .fight-opponent,.combat-workbench .loadout-review{border:1px solid #907548;border-radius:12px;padding:16px;background:linear-gradient(125deg,#302435,#211c29);color:#f3dfb4}
+.combat-workbench .fight-opponent>span,.combat-workbench .loadout-review>span{display:block;font-size:10px;letter-spacing:.14em;color:#cfb27d;margin-bottom:8px}
+.combat-workbench .fight-opponent>strong,.combat-workbench .loadout-review>strong{display:block;font:24px/1.15 'Bangers',Georgia,serif;letter-spacing:.03em}
+.combat-workbench .fight-opponent p,.combat-workbench .loadout-review p{font-size:13px;line-height:1.6;margin:8px 0;color:#dbcbdc}
+.combat-workbench .loadout-review small{color:#c6b8cb;line-height:1.5;display:block}
+.combat-workbench>button.primary{min-height:56px;white-space:normal;font-size:19px}
+.optional-actions{border:1px solid #63516c;border-radius:10px;margin:12px 0;background:#201b28}
+.optional-actions>summary{padding:15px;cursor:pointer;color:#f1d69c;font-weight:600}
+.optional-actions>summary>span{display:block;font:11px/1.5 system-ui;color:#c6b9cb;margin:5px 0 0}
+.optional-actions>.choice-grid{padding:0 12px 12px}
+#next-step-guide{scroll-margin-top:80px}
+#next-step-guide:focus-visible{outline:2px solid #e4bf76;outline-offset:4px}
+@media(max-width:700px){.combat-workbench>button.primary{width:100%}.combat-workbench .fight-opponent,.combat-workbench .loadout-review{padding:13px}}

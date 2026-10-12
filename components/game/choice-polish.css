@@ -1,0 +1,31 @@
+/* Printed action cards: a picture, a named choice, and its immediate consequence. */
+.choice-kind{display:flex;align-items:center;gap:5px;min-height:12px;font-weight:700;letter-spacing:1.25px}
+.choice-kind>svg{flex:none;opacity:.85}
+.choice-card.action-choice{--choice-ink:#65472d;border-color:#c2a273;background:linear-gradient(116deg,#e6cf9d,#f5e7c1 46%,#d5b981)}
+.action-choice .choice-art{height:82px;border-color:#765339}
+.action-choice .choice-copy{flex:initial;gap:7px;padding:11px 10px 8px}
+.action-choice .choice-copy>strong{font-size:17px;line-height:1.22}
+.action-choice .choice-kind{color:var(--choice-ink)}
+.action-choice.choice-gain{--choice-ink:#405b39}
+.action-choice.choice-risk{--choice-ink:#8a3e3b}
+.action-choice.choice-power{--choice-ink:#674675}
+.choice-result{display:block;flex:1;padding:0 10px 12px;font:12px/1.5 Arial,sans-serif;color:#5b4735;overflow-wrap:anywhere}
+.action-choice .choice-foot{min-height:40px;padding:9px 10px;gap:9px;letter-spacing:.45px;line-height:1.4;text-transform:none;font-size:11px;font-weight:700;color:var(--choice-ink);background:#7252360b;border-top:1px solid #a7844d60}
+.action-choice .choice-foot>svg{flex:none;transition:transform .15s}
+.action-choice:hover:not(:disabled) .choice-foot>svg{transform:translateX(3px)}
+.action-choice.choice-gain .choice-foot{background:#42623b12}
+.action-choice.choice-risk .choice-foot{background:#9b3d3a0d}
+.action-choice.choice-power .choice-foot{background:#6e458013}
+.choice-mini .choice-kind>svg{width:9px;height:9px}
+.choice-mini.selected{box-shadow:0 2px 0 #665237,inset 0 0 0 1px #fff5d8}
+.choice-badges i{font-style:normal;font-weight:700}
+@media(max-width:760px){
+  .action-choice .choice-art{height:67px}
+  .action-choice .choice-copy{padding:9px 8px 7px;gap:5px}
+  .action-choice .choice-copy>strong{font-size:15px;line-height:1.25}
+  .action-choice .choice-kind{font-size:8px;letter-spacing:.75px;gap:4px}
+  .choice-result{font-size:11px;line-height:1.45;padding:0 8px 10px}
+  .action-choice .choice-foot{padding:8px;min-height:42px;font-size:10px;letter-spacing:.2px}
+  .choice-mini .choice-kind>svg{display:none}
+}
+@media(prefers-reduced-motion:reduce){.action-choice .choice-foot>svg{transition:none}}

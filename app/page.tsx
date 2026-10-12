@@ -16,6 +16,7 @@ import { FieldGuide } from "@/components/game/FieldGuide";
 import { ComfortSettings, useTableComfort } from "@/components/game/TableComfort";
 import { ChoiceCard, CardSelect } from '@/components/game/ChoiceCards';
 import { TableDock, QuestProgress } from '@/components/game/TableDock';
+import "@/components/game/play-flow.css";
 import { TableActivity } from '@/components/game/TableActivity';
 import { StartGame, GameLobby, SavedTables } from '@/components/game/StartGame';
 import { LearnToPlay } from "@/components/game/LearnToPlay";
@@ -89,7 +90,12 @@ function CombatForm({
   act: (a: Action) => void;
   busy: boolean;
 }) {
-  const [weapon, setWeapon] = useState(""),
+  const fight = room.combat!;
+  const weapons = p.items.filter(id => ![...p.homies, ...p.bones].some(x => ["Officer Harry Cox", "Slippery Palms"].includes(cardName(x))) && card(id).weapon && (!fight.ranged || p.id !== fight.attacker || card(id).ranged) && !fight.cards.some(x => cardName(x) === 'R. O. C.'));
+  const drinks = p.items.filter(id => card(id).use === 'drink');
+  const armor = p.items.filter(id => card(id).use === 'armor');
+  const needsRangedWeapon = fight.ranged && p.id === fight.attacker;
+  const [weapon, setWeapon] = useState(needsRangedWeapon ? weapons[0] ?? "" : ""),
     [drink, setDrink] = useState(""),
     [defense, setDefense] = useState(""),
     [finisher, setFinisher] = useState(false),
@@ -100,18 +106,21 @@ function CombatForm({
   const f = room.combat!;
   const powers = room.yourPowers;
   const has = (id: string) => powers.some((x) => x.id === id);
+  const selectedWeapon = weapons.includes(weapon) ? weapon : needsRangedWeapon ? weapons[0] ?? '' : '';
+  const selectedDrink = drinks.includes(drink) ? drink : '';
+  const selectedDefense = armor.includes(defense) ? defense : '';
   if (f.choices[p.id])
     return <p>Your combat choice is locked. Waiting for the other player.</p>;
   return (
     <form
-      className="stack"
+      className="stack combat-workbench"
       onSubmit={(e) => {
         e.preventDefault();
         act({
           type: "combat-choice",
-          weapon: weapon || null,
-          drink: drink || null,
-          defense: defense || null,
+          weapon: selectedWeapon || null,
+          drink: selectedDrink || null,
+          defense: selectedDefense || null,
           finisher,
           escape,
           suppress,
@@ -127,23 +136,16 @@ function CombatForm({
             ? "Ranged combat"
             : "Choose your combat equipment"}
       </h3>
+      <div className="fight-opponent"><span>YOUR OPPONENT</span><strong>{f.defender ? room.players.find(q => q.id === (p.id === f.attacker ? f.defender : f.attacker))?.name : f.cards.map(cardName).join(' + ') || 'The final challenge'}</strong><p>Pick your equipment, review it below, then confirm. The game rolls and applies supported bonuses for you.</p></div>
       <p className="small">
         Each combatant chooses before the dice are rolled. A natural 10 wins and
         a natural 1 loses; matching automatic results tie.
       </p>
       <label>
-        Weapon
-        <CardSelect aria-label="Weapon" value={weapon} onChange={(e) => setWeapon(e.target.value)}>
-          <option value="">No Weapon</option>
-          {p.items
-            .filter(
-              (id) =>
-                ![...p.homies, ...p.bones].some((x) =>
-                  ["Officer Harry Cox", "Slippery Palms"].includes(cardName(x)),
-                ) &&
-                card(id).weapon &&
-                (!f.ranged || p.id !== f.attacker || card(id).ranged) && !f.cards.some(id=>cardName(id)==='R. O. C.'),
-            )
+        1 · Choose a weapon
+        <CardSelect aria-label="Weapon" value={selectedWeapon} onChange={(e) => setWeapon(e.target.value)}>
+          {!needsRangedWeapon && <option value="">Fight unarmed</option>}
+          {weapons
             .map((id) => (
               <option key={id} value={id}>
                 {cardName(id)} (+{card(id).combat})
@@ -151,32 +153,30 @@ function CombatForm({
             ))}
         </CardSelect>
       </label>
-      <label>
-        Consume a 2-liter for +2
-        <CardSelect aria-label="Consume a 2-liter for +2" value={drink} onChange={(e) => setDrink(e.target.value)}>
+      {drinks.length > 0 && <label>
+        Optional · spend a drink for +2
+        <CardSelect aria-label="Consume a 2-liter for +2" value={selectedDrink} onChange={(e) => setDrink(e.target.value)}>
           <option value="">Save my drinks</option>
-          {p.items
-            .filter((id) => card(id).use === "drink")
+          {drinks
             .map((id) => (
               <option key={id} value={id}>
                 {cardName(id)}
               </option>
             ))}
         </CardSelect>
-      </label>
-      <label>
-        Protect against Life loss
-        <CardSelect aria-label="Protect against Life loss" value={defense} onChange={(e) => setDefense(e.target.value)}>
+      </label>}
+      {armor.length > 0 && <label>
+        Optional · protect against Life loss
+        <CardSelect aria-label="Protect against Life loss" value={selectedDefense} onChange={(e) => setDefense(e.target.value)}>
           <option value="">No armor</option>
-          {p.items
-            .filter((id) => card(id).use === "armor")
+          {armor
             .map((id) => (
               <option key={id} value={id}>
                 {cardName(id)}
               </option>
             ))}
         </CardSelect>
-      </label>
+      </label>}
       {has("fiend_finishing_move") && !f.defender && (
         <label className="check">
           <input
@@ -234,8 +234,9 @@ function CombatForm({
           />
         </label>
       </details>
-      <button className="primary" disabled={busy}>
-        Lock choice & roll when ready
+      <div className="loadout-review" aria-live="polite"><span>2 · REVIEW YOUR CHOICE</span><strong>{selectedWeapon ? cardName(selectedWeapon) : 'Fighting unarmed'}</strong><p>{selectedDrink ? `${cardName(selectedDrink)} will be consumed for +2 combat.` : 'No drink will be spent.'} {selectedDefense ? `${cardName(selectedDefense)} selected for protection.` : 'No armor selected.'}</p><small>Your base strength: {p.bonus} CB. Other supported effects are counted automatically.</small>{(finisher || escape || suppress || modifier !== 0) && <p>{finisher && 'Finishing move selected: +2, but lose 2 Lives on defeat. '}{escape && 'Escape attempt selected: +5, but a win becomes a tie. '}{suppress && 'Opponent’s Homies will be suppressed. '}{modifier !== 0 && `Table modifier: ${modifier > 0 ? '+' : ''}${modifier}.`}</p>}</div>
+      <button className="primary" disabled={busy || (needsRangedWeapon && !selectedWeapon)}>
+        {busy ? 'Confirming equipment…' : f.defender ? 'Confirm equipment · roll when both ready' : 'Confirm equipment & roll →'}
       </button>
     </form>
   );
@@ -805,6 +806,9 @@ export default function Home() {
           version: r.rev,
         });
         update(next);
+        if (next.status === 'playing' && (next.phase !== r.phase || next.turn !== r.turn)) {
+          requestAnimationFrame(() => jumpToTableSection('next-step-guide'));
+        }
         return { phase: next.phase, status: next.status, revision: next.rev };
       } catch (e) {
         setError((e as Error).message);
@@ -880,7 +884,7 @@ export default function Home() {
     host = me?.id === room?.host,
     choices = myTurn ? (room?.choices ?? []) : [],
     roster = characterRecord(character);
-  const groups = [...new Set(room?.options?.map((o) => o.group) ?? [])];
+  const groups = [...new Set(room?.options?.map((o) => o.group) ?? [])].sort((a,b) => Number(b === "Turn") - Number(a === "Turn"));
   const inCombat =
     room?.combat &&
     p &&
@@ -1351,12 +1355,12 @@ export default function Home() {
                       </p>
                     </div>
                   )}
-                  {groups.map((group) => (
-                    <div className="option-group" key={group}>
-                      <h3>{group}</h3>
-                      <div className="choice-grid">{room.options.filter(o=>o.group===group).map((o,i)=><ChoiceCard key={JSON.stringify(o.action)+i} option={o} disabled={busy||offline} onChoose={()=>action(o.action)}/>)}</div>
-                    </div>
-                  ))}
+                  {groups.map((group) => {
+                    const options = room.options.filter(o => o.group === group);
+                    const cards = <div className="choice-grid">{options.map((o,i)=><ChoiceCard key={JSON.stringify(o.action)+i} option={o} disabled={busy||offline} onChoose={()=>action(o.action)}/>)}</div>;
+                    const optional = ['Items', 'Items & Homies', 'Powers', 'Trade'].includes(group ?? '');
+                    return optional ? <details className="optional-actions" key={group} open={room.phase === 'combat' ? true : undefined}><summary>{group} <span>{options.length} available · optional</span></summary>{cards}</details> : <div className="option-group" key={group}><h3>{group === 'Turn' ? 'Continue your turn' : group}</h3>{cards}</div>;
+                  })}
                   {myTurn &&
                     room.phase === "end" &&
                     p?.region === 0 &&
